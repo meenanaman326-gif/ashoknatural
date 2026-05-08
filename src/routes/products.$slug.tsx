@@ -1,7 +1,7 @@
 import { createFileRoute, Link, notFound } from "@tanstack/react-router";
 import { useState } from "react";
 import { Star, Truck, ShieldCheck, RotateCcw, Minus, Plus, Heart, ChevronRight, CheckCircle2 } from "lucide-react";
-import { getProduct, related } from "@/lib/products";
+import { getProduct, related, type Product } from "@/lib/products";
 import { useCart, inr } from "@/lib/cart-store";
 import { ProductCard } from "@/components/site/ProductCard";
 import { toast } from "sonner";
@@ -30,7 +30,7 @@ export const Route = createFileRoute("/products/$slug")({
 });
 
 function PDP() {
-  const { product } = Route.useLoaderData();
+  const { product } = Route.useLoaderData() as { product: Product };
   const [weight, setWeight] = useState(product.weights[0].label);
   const [qty, setQty] = useState(1);
   const { add } = useCart();
