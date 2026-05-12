@@ -1,36 +1,127 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
-import { useState } from "react";
-import { CreditCard, Wallet, Smartphone, Truck, Lock, CheckCircle2 } from "lucide-react";
+import { useEffect, useRef, useState } from "react";
+import { useServerFn } from "@tanstack/react-start";
+import { CreditCard, Wallet, Truck, Lock, CheckCircle2 } from "lucide-react";
 import { useCart, findProduct, inr } from "@/lib/cart-store";
 import { toast } from "sonner";
+import { createRazorpayOrder, verifyRazorpayPayment } from "@/lib/razorpay.functions";
+
+declare global {
+  interface Window {
+    Razorpay?: new (opts: Record<string, unknown>) => { open: () => void; on: (e: string, cb: (r: unknown) => void) => void };
+  }
+}
 
 export const Route = createFileRoute("/checkout")({
   head: () => ({ meta: [{ title: "Checkout — Ashok Naturals" }] }),
   component: Checkout,
 });
 
+function loadRazorpayScript(): Promise<boolean> {
+  return new Promise((resolve) => {
+    if (typeof window === "undefined") return resolve(false);
+    if (window.Razorpay) return resolve(true);
+    const s = document.createElement("script");
+    s.src = "https://checkout.razorpay.com/v1/checkout.js";
+    s.onload = () => resolve(true);
+    s.onerror = () => resolve(false);
+    document.body.appendChild(s);
+  });
+}
+
 function Checkout() {
   const { items, subtotal, clear } = useCart();
   const navigate = useNavigate();
-  const [method, setMethod] = useState<"stripe" | "upi" | "cod">("stripe");
+  const createOrderFn = useServerFn(createRazorpayOrder);
+  const verifyFn = useServerFn(verifyRazorpayPayment);
+  const [method, setMethod] = useState<"razorpay" | "cod">("razorpay");
   const [processing, setProcessing] = useState(false);
+  const formRef = useRef<HTMLFormElement>(null);
+
+  useEffect(() => { loadRazorpayScript(); }, []);
 
   const shipping = subtotal > 599 ? 0 : 49;
   const gst = Math.round(subtotal * 0.05);
   const total = subtotal + shipping + gst;
 
-  const placeOrder = (e: React.FormEvent) => {
+  const completeOrder = (paymentInfo: { orderId: string; paymentId?: string; method: string }) => {
+    try {
+      localStorage.setItem("an_last_order", JSON.stringify({ ...paymentInfo, total, items }));
+    } catch {}
+    clear();
+    toast.success("Order placed successfully!");
+    navigate({ to: "/order-success", search: { id: paymentInfo.orderId } as never });
+  };
+
+  const placeOrder = async (e: React.FormEvent) => {
     e.preventDefault();
     setProcessing(true);
-    setTimeout(() => {
+
+    if (method === "cod") {
       const orderId = "AN" + Math.floor(100000 + Math.random() * 900000);
-      try {
-        localStorage.setItem("an_last_order", JSON.stringify({ orderId, total, method, items }));
-      } catch {}
-      clear();
-      toast.success("Order placed successfully!");
-      navigate({ to: "/order-success", search: { id: orderId } as never });
-    }, 1200);
+      completeOrder({ orderId, method: "cod" });
+      return;
+    }
+
+    try {
+      const ok = await loadRazorpayScript();
+      if (!ok || !window.Razorpay) throw new Error("Razorpay failed to load. Check your connection.");
+
+      const order = await createOrderFn({ data: { amount: total, currency: "INR", receipt: `AN_${Date.now()}` } });
+      const form = formRef.current;
+      const get = (name: string) => (form?.elements.namedItem(name) as HTMLInputElement | null)?.value ?? "";
+
+      const rzp = new window.Razorpay({
+        key: order.keyId,
+        amount: order.amount,
+        currency: order.currency,
+        order_id: order.orderId,
+        name: "Ashok Naturals",
+        description: "Pure Indian Spices & Natural Foods",
+        prefill: {
+          name: `${get("firstName")} ${get("lastName")}`.trim(),
+          email: get("email"),
+          contact: get("phone"),
+        },
+        notes: {
+          address: `${get("address1")} ${get("address2")} ${get("city")} ${get("state")} ${get("pincode")}`,
+        },
+        theme: { color: "#1f3d2b" },
+        method: { upi: true, card: true, netbanking: true, wallet: true },
+        handler: async (response: { razorpay_order_id: string; razorpay_payment_id: string; razorpay_signature: string }) => {
+          try {
+            await verifyFn({
+              data: {
+                orderId: response.razorpay_order_id,
+                paymentId: response.razorpay_payment_id,
+                signature: response.razorpay_signature,
+              },
+            });
+            completeOrder({ orderId: response.razorpay_order_id, paymentId: response.razorpay_payment_id, method: "razorpay" });
+          } catch (err) {
+            console.error(err);
+            toast.error("Payment verification failed. Please contact support.");
+            setProcessing(false);
+          }
+        },
+        modal: {
+          ondismiss: () => {
+            toast.info("Payment cancelled");
+            setProcessing(false);
+          },
+        },
+      });
+      rzp.on("payment.failed", (resp: unknown) => {
+        console.error("Razorpay payment failed:", resp);
+        toast.error("Payment failed. Please try again.");
+        setProcessing(false);
+      });
+      rzp.open();
+    } catch (err) {
+      console.error(err);
+      toast.error(err instanceof Error ? err.message : "Could not start payment");
+      setProcessing(false);
+    }
   };
 
   if (items.length === 0) {
@@ -44,14 +135,14 @@ function Checkout() {
   return (
     <section className="container-x py-12">
       <h1 className="font-display text-4xl md:text-5xl text-primary mb-8">Checkout</h1>
-      <form onSubmit={placeOrder} className="grid lg:grid-cols-3 gap-8">
+      <form ref={formRef} onSubmit={placeOrder} className="grid lg:grid-cols-3 gap-8">
         <div className="lg:col-span-2 space-y-6">
           {/* Contact */}
           <div className="bg-card rounded-2xl p-6 shadow-card">
             <h2 className="font-display text-xl text-primary mb-4">Contact</h2>
             <div className="grid sm:grid-cols-2 gap-3">
-              <input required type="email" placeholder="Email address" className="px-4 py-3 rounded-xl border border-border bg-background outline-none focus:border-primary" />
-              <input required placeholder="Phone (+91)" className="px-4 py-3 rounded-xl border border-border bg-background outline-none focus:border-primary" />
+              <input name="email" required type="email" placeholder="Email address" className="px-4 py-3 rounded-xl border border-border bg-background outline-none focus:border-primary" />
+              <input name="phone" required placeholder="Phone (+91)" className="px-4 py-3 rounded-xl border border-border bg-background outline-none focus:border-primary" />
             </div>
           </div>
 
@@ -59,13 +150,13 @@ function Checkout() {
           <div className="bg-card rounded-2xl p-6 shadow-card">
             <h2 className="font-display text-xl text-primary mb-4">Shipping address</h2>
             <div className="grid sm:grid-cols-2 gap-3">
-              <input required placeholder="First name" className="px-4 py-3 rounded-xl border border-border bg-background outline-none focus:border-primary" />
-              <input required placeholder="Last name" className="px-4 py-3 rounded-xl border border-border bg-background outline-none focus:border-primary" />
-              <input required placeholder="Address line 1" className="sm:col-span-2 px-4 py-3 rounded-xl border border-border bg-background outline-none focus:border-primary" />
-              <input placeholder="Apartment, suite (optional)" className="sm:col-span-2 px-4 py-3 rounded-xl border border-border bg-background outline-none focus:border-primary" />
-              <input required placeholder="City" className="px-4 py-3 rounded-xl border border-border bg-background outline-none focus:border-primary" />
-              <input required placeholder="State" className="px-4 py-3 rounded-xl border border-border bg-background outline-none focus:border-primary" />
-              <input required placeholder="Pincode" className="px-4 py-3 rounded-xl border border-border bg-background outline-none focus:border-primary" />
+              <input name="firstName" required placeholder="First name" className="px-4 py-3 rounded-xl border border-border bg-background outline-none focus:border-primary" />
+              <input name="lastName" required placeholder="Last name" className="px-4 py-3 rounded-xl border border-border bg-background outline-none focus:border-primary" />
+              <input name="address1" required placeholder="Address line 1" className="sm:col-span-2 px-4 py-3 rounded-xl border border-border bg-background outline-none focus:border-primary" />
+              <input name="address2" placeholder="Apartment, suite (optional)" className="sm:col-span-2 px-4 py-3 rounded-xl border border-border bg-background outline-none focus:border-primary" />
+              <input name="city" required placeholder="City" className="px-4 py-3 rounded-xl border border-border bg-background outline-none focus:border-primary" />
+              <input name="state" required placeholder="State" className="px-4 py-3 rounded-xl border border-border bg-background outline-none focus:border-primary" />
+              <input name="pincode" required placeholder="Pincode" className="px-4 py-3 rounded-xl border border-border bg-background outline-none focus:border-primary" />
               <input value="India" disabled className="px-4 py-3 rounded-xl border border-border bg-muted outline-none" />
             </div>
           </div>
@@ -75,12 +166,11 @@ function Checkout() {
             <h2 className="font-display text-xl text-primary mb-4">Payment method</h2>
             <div className="space-y-2">
               {[
-                { id: "stripe", icon: CreditCard, t: "Credit / Debit Card", d: "Secure Stripe checkout · Visa, Mastercard, RuPay" },
-                { id: "upi", icon: Smartphone, t: "UPI / Google Pay / PhonePe", d: "Pay instantly from any UPI app" },
-                { id: "cod", icon: Truck, t: "Cash on Delivery", d: "Pay when your order arrives" },
+                { id: "razorpay" as const, icon: CreditCard, t: "Pay Online — Cards, UPI, Net Banking, Wallets", d: "Secured by Razorpay · Visa, Mastercard, RuPay, GPay, PhonePe, Paytm" },
+                { id: "cod" as const, icon: Truck, t: "Cash on Delivery", d: "Pay when your order arrives" },
               ].map(m => (
                 <label key={m.id} className={`flex items-start gap-3 p-4 rounded-xl border cursor-pointer transition-colors ${method === m.id ? "border-primary bg-primary/5" : "border-border hover:border-primary/50"}`}>
-                  <input type="radio" name="pay" checked={method === m.id} onChange={() => setMethod(m.id as typeof method)} className="mt-1.5 accent-[var(--primary)]" />
+                  <input type="radio" name="pay" checked={method === m.id} onChange={() => setMethod(m.id)} className="mt-1.5 accent-[var(--primary)]" />
                   <m.icon className="w-5 h-5 text-primary mt-0.5" />
                   <div>
                     <p className="font-semibold">{m.t}</p>
@@ -90,7 +180,7 @@ function Checkout() {
               ))}
             </div>
             <p className="flex items-center gap-2 text-xs text-muted-foreground mt-4">
-              <Lock className="w-3.5 h-3.5" /> SSL secured · Your data is encrypted end-to-end
+              <Lock className="w-3.5 h-3.5" /> SSL secured · Payments processed by Razorpay (PCI-DSS compliant)
             </p>
           </div>
         </div>
@@ -121,7 +211,7 @@ function Checkout() {
           <button disabled={processing} className="w-full inline-flex items-center justify-center gap-2 px-6 py-3 rounded-full bg-primary text-primary-foreground font-semibold hover:bg-gold hover:text-gold-foreground transition-colors disabled:opacity-60">
             {processing ? "Processing…" : <>Place Order · {inr(total)}<CheckCircle2 className="w-4 h-4" /></>}
           </button>
-          <p className="text-xs text-muted-foreground text-center flex items-center justify-center gap-1"><Wallet className="w-3 h-3" /> Stripe · UPI · COD all supported</p>
+          <p className="text-xs text-muted-foreground text-center flex items-center justify-center gap-1"><Wallet className="w-3 h-3" /> Cards · UPI · Net Banking · Wallets · COD</p>
         </aside>
       </form>
     </section>
