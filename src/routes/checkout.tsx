@@ -135,14 +135,14 @@ function Checkout() {
   return (
     <section className="container-x py-12">
       <h1 className="font-display text-4xl md:text-5xl text-primary mb-8">Checkout</h1>
-      <form onSubmit={placeOrder} className="grid lg:grid-cols-3 gap-8">
+      <form ref={formRef} onSubmit={placeOrder} className="grid lg:grid-cols-3 gap-8">
         <div className="lg:col-span-2 space-y-6">
           {/* Contact */}
           <div className="bg-card rounded-2xl p-6 shadow-card">
             <h2 className="font-display text-xl text-primary mb-4">Contact</h2>
             <div className="grid sm:grid-cols-2 gap-3">
-              <input required type="email" placeholder="Email address" className="px-4 py-3 rounded-xl border border-border bg-background outline-none focus:border-primary" />
-              <input required placeholder="Phone (+91)" className="px-4 py-3 rounded-xl border border-border bg-background outline-none focus:border-primary" />
+              <input name="email" required type="email" placeholder="Email address" className="px-4 py-3 rounded-xl border border-border bg-background outline-none focus:border-primary" />
+              <input name="phone" required placeholder="Phone (+91)" className="px-4 py-3 rounded-xl border border-border bg-background outline-none focus:border-primary" />
             </div>
           </div>
 
@@ -150,13 +150,13 @@ function Checkout() {
           <div className="bg-card rounded-2xl p-6 shadow-card">
             <h2 className="font-display text-xl text-primary mb-4">Shipping address</h2>
             <div className="grid sm:grid-cols-2 gap-3">
-              <input required placeholder="First name" className="px-4 py-3 rounded-xl border border-border bg-background outline-none focus:border-primary" />
-              <input required placeholder="Last name" className="px-4 py-3 rounded-xl border border-border bg-background outline-none focus:border-primary" />
-              <input required placeholder="Address line 1" className="sm:col-span-2 px-4 py-3 rounded-xl border border-border bg-background outline-none focus:border-primary" />
-              <input placeholder="Apartment, suite (optional)" className="sm:col-span-2 px-4 py-3 rounded-xl border border-border bg-background outline-none focus:border-primary" />
-              <input required placeholder="City" className="px-4 py-3 rounded-xl border border-border bg-background outline-none focus:border-primary" />
-              <input required placeholder="State" className="px-4 py-3 rounded-xl border border-border bg-background outline-none focus:border-primary" />
-              <input required placeholder="Pincode" className="px-4 py-3 rounded-xl border border-border bg-background outline-none focus:border-primary" />
+              <input name="firstName" required placeholder="First name" className="px-4 py-3 rounded-xl border border-border bg-background outline-none focus:border-primary" />
+              <input name="lastName" required placeholder="Last name" className="px-4 py-3 rounded-xl border border-border bg-background outline-none focus:border-primary" />
+              <input name="address1" required placeholder="Address line 1" className="sm:col-span-2 px-4 py-3 rounded-xl border border-border bg-background outline-none focus:border-primary" />
+              <input name="address2" placeholder="Apartment, suite (optional)" className="sm:col-span-2 px-4 py-3 rounded-xl border border-border bg-background outline-none focus:border-primary" />
+              <input name="city" required placeholder="City" className="px-4 py-3 rounded-xl border border-border bg-background outline-none focus:border-primary" />
+              <input name="state" required placeholder="State" className="px-4 py-3 rounded-xl border border-border bg-background outline-none focus:border-primary" />
+              <input name="pincode" required placeholder="Pincode" className="px-4 py-3 rounded-xl border border-border bg-background outline-none focus:border-primary" />
               <input value="India" disabled className="px-4 py-3 rounded-xl border border-border bg-muted outline-none" />
             </div>
           </div>
@@ -166,12 +166,11 @@ function Checkout() {
             <h2 className="font-display text-xl text-primary mb-4">Payment method</h2>
             <div className="space-y-2">
               {[
-                { id: "stripe", icon: CreditCard, t: "Credit / Debit Card", d: "Secure Stripe checkout · Visa, Mastercard, RuPay" },
-                { id: "upi", icon: Smartphone, t: "UPI / Google Pay / PhonePe", d: "Pay instantly from any UPI app" },
-                { id: "cod", icon: Truck, t: "Cash on Delivery", d: "Pay when your order arrives" },
+                { id: "razorpay" as const, icon: CreditCard, t: "Pay Online — Cards, UPI, Net Banking, Wallets", d: "Secured by Razorpay · Visa, Mastercard, RuPay, GPay, PhonePe, Paytm" },
+                { id: "cod" as const, icon: Truck, t: "Cash on Delivery", d: "Pay when your order arrives" },
               ].map(m => (
                 <label key={m.id} className={`flex items-start gap-3 p-4 rounded-xl border cursor-pointer transition-colors ${method === m.id ? "border-primary bg-primary/5" : "border-border hover:border-primary/50"}`}>
-                  <input type="radio" name="pay" checked={method === m.id} onChange={() => setMethod(m.id as typeof method)} className="mt-1.5 accent-[var(--primary)]" />
+                  <input type="radio" name="pay" checked={method === m.id} onChange={() => setMethod(m.id)} className="mt-1.5 accent-[var(--primary)]" />
                   <m.icon className="w-5 h-5 text-primary mt-0.5" />
                   <div>
                     <p className="font-semibold">{m.t}</p>
@@ -181,7 +180,7 @@ function Checkout() {
               ))}
             </div>
             <p className="flex items-center gap-2 text-xs text-muted-foreground mt-4">
-              <Lock className="w-3.5 h-3.5" /> SSL secured · Your data is encrypted end-to-end
+              <Lock className="w-3.5 h-3.5" /> SSL secured · Payments processed by Razorpay (PCI-DSS compliant)
             </p>
           </div>
         </div>
