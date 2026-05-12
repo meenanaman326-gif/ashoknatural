@@ -68,6 +68,8 @@ function Checkout() {
       if (!ok || !window.Razorpay) throw new Error("Razorpay failed to load. Check your connection.");
 
       const order = await createOrderFn({ data: { amount: total, currency: "INR", receipt: `AN_${Date.now()}` } });
+      console.log("[checkout] Razorpay order created", order);
+      if (!order?.orderId || !order?.keyId) throw new Error("Invalid payment order response");
       const form = formRef.current;
       const get = (name: string) => (form?.elements.namedItem(name) as HTMLInputElement | null)?.value ?? "";
 
