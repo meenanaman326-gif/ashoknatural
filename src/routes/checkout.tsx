@@ -1,7 +1,7 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useEffect, useRef, useState } from "react";
 import { useServerFn } from "@tanstack/react-start";
-import { CreditCard, Wallet, Smartphone, Truck, Lock, CheckCircle2 } from "lucide-react";
+import { CreditCard, Wallet, Truck, Lock, CheckCircle2 } from "lucide-react";
 import { useCart, findProduct, inr } from "@/lib/cart-store";
 import { toast } from "sonner";
 import { createRazorpayOrder, verifyRazorpayPayment } from "@/lib/razorpay.functions";
