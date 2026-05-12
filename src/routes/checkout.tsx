@@ -211,7 +211,7 @@ function Checkout() {
           <button disabled={processing} className="w-full inline-flex items-center justify-center gap-2 px-6 py-3 rounded-full bg-primary text-primary-foreground font-semibold hover:bg-gold hover:text-gold-foreground transition-colors disabled:opacity-60">
             {processing ? "Processing…" : <>Place Order · {inr(total)}<CheckCircle2 className="w-4 h-4" /></>}
           </button>
-          <p className="text-xs text-muted-foreground text-center flex items-center justify-center gap-1"><Wallet className="w-3 h-3" /> Stripe · UPI · COD all supported</p>
+          <p className="text-xs text-muted-foreground text-center flex items-center justify-center gap-1"><Wallet className="w-3 h-3" /> Cards · UPI · Net Banking · Wallets · COD</p>
         </aside>
       </form>
     </section>
