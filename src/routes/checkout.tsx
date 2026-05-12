@@ -210,8 +210,8 @@ function Checkout() {
             <div className="flex justify-between"><span>GST (5%)</span><span>{inr(gst)}</span></div>
             <div className="flex justify-between font-display text-lg text-primary border-t pt-2 mt-2"><span>Total</span><span>{inr(total)}</span></div>
           </div>
-          <button disabled={processing} className="w-full inline-flex items-center justify-center gap-2 px-6 py-3 rounded-full bg-primary text-primary-foreground font-semibold hover:bg-gold hover:text-gold-foreground transition-colors disabled:opacity-60">
-            {processing ? "Processing…" : <>Place Order · {inr(total)}<CheckCircle2 className="w-4 h-4" /></>}
+          <button type="submit" disabled={processing} className="w-full inline-flex items-center justify-center gap-2 px-6 py-3 rounded-full bg-primary text-primary-foreground font-semibold hover:bg-gold hover:text-gold-foreground transition-colors disabled:opacity-60">
+            {processing ? "Processing…" : method === "cod" ? <>Place Order · {inr(total)}<CheckCircle2 className="w-4 h-4" /></> : <>Pay {inr(total)}<Lock className="w-4 h-4" /></>}
           </button>
           <p className="text-xs text-muted-foreground text-center flex items-center justify-center gap-1"><Wallet className="w-3 h-3" /> Cards · UPI · Net Banking · Wallets · COD</p>
         </aside>
