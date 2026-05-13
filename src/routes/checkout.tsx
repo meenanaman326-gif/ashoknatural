@@ -89,7 +89,15 @@ function Checkout() {
           address: `${get("address1")} ${get("address2")} ${get("city")} ${get("state")} ${get("pincode")}`,
         },
         theme: { color: "#1f3d2b" },
-        method: { upi: true, card: true, netbanking: true, wallet: true },
+        retry: { enabled: true, max_count: 2 },
+        send_sms_hash: true,
+        remember_customer: false,
+        config: {
+          display: {
+            preferences: { show_default_blocks: true },
+          },
+        },
+        // Do NOT restrict `method` — it disables UPI intent apps (GPay/PhonePe/Paytm) on mobile.
         handler: async (response: { razorpay_order_id: string; razorpay_payment_id: string; razorpay_signature: string }) => {
           try {
             await verifyFn({
