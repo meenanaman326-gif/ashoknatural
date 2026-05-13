@@ -2,9 +2,7 @@ import { createServerFn } from "@tanstack/react-start";
 import { createHmac } from "crypto";
 
 function verifySignature(orderId: string, paymentId: string, signature: string, secret: string) {
-  const expected = createHmac("sha256", secret)
-    .update(`${orderId}|${paymentId}`)
-    .digest("hex");
+  const expected = createHmac("sha256", secret).update(`${orderId}|${paymentId}`).digest("hex");
   return expected === signature;
 }
 
@@ -65,7 +63,13 @@ export const verifyRazorpayPayment = createServerFn({ method: "POST" })
     if (!secret) throw new Error("Razorpay secret not configured");
     const valid = verifySignature(data.orderId, data.paymentId, data.signature, secret);
     if (!valid) throw new Error("Payment signature verification failed");
-    return { valid: true, paid: true, status: "paid", paymentId: data.paymentId, orderId: data.orderId };
+    return {
+      valid: true,
+      paid: true,
+      status: "paid",
+      paymentId: data.paymentId,
+      orderId: data.orderId,
+    };
   });
 
 export const getRazorpayOrderStatus = createServerFn({ method: "POST" })
@@ -78,12 +82,16 @@ export const getRazorpayOrderStatus = createServerFn({ method: "POST" })
 
     if (data.paymentId && data.signature) {
       const valid = verifySignature(data.orderId, data.paymentId, data.signature, keySecret);
-      if (valid) return { status: "paid", paid: true, orderId: data.orderId, paymentId: data.paymentId };
+      if (valid)
+        return { status: "paid", paid: true, orderId: data.orderId, paymentId: data.paymentId };
     }
 
-    const res = await fetch(`https://api.razorpay.com/v1/orders/${encodeURIComponent(data.orderId)}`, {
-      headers: { Authorization: authorization },
-    });
+    const res = await fetch(
+      `https://api.razorpay.com/v1/orders/${encodeURIComponent(data.orderId)}`,
+      {
+        headers: { Authorization: authorization },
+      },
+    );
 
     if (!res.ok) {
       const err = await res.text();
@@ -91,7 +99,12 @@ export const getRazorpayOrderStatus = createServerFn({ method: "POST" })
       throw new Error("Could not check payment status");
     }
 
-    const order = (await res.json()) as { id: string; status: string; amount_paid?: number; attempts?: number };
+    const order = (await res.json()) as {
+      id: string;
+      status: string;
+      amount_paid?: number;
+      attempts?: number;
+    };
     const paid = order.status === "paid" || (order.amount_paid ?? 0) > 0;
     return {
       status: paid ? "paid" : order.status,

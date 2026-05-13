@@ -25,10 +25,10 @@ async function handleRazorpayCallback(request: Request) {
 
   const isValid = Boolean(
     secret &&
-      orderId &&
-      paymentId &&
-      signature &&
-      createHmac("sha256", secret).update(`${orderId}|${paymentId}`).digest("hex") === signature,
+    orderId &&
+    paymentId &&
+    signature &&
+    createHmac("sha256", secret).update(`${orderId}|${paymentId}`).digest("hex") === signature,
   );
 
   params.set("payment", isValid ? "success" : "failed");
@@ -41,7 +41,9 @@ async function readPostedValues(request: Request) {
   const contentType = request.headers.get("content-type") ?? "";
   if (contentType.includes("application/json")) {
     const body = (await request.json()) as Record<string, string | undefined>;
-    return new URLSearchParams(Object.entries(body).flatMap(([key, value]) => (value ? [[key, value]] : [])));
+    return new URLSearchParams(
+      Object.entries(body).flatMap(([key, value]) => (value ? [[key, value]] : [])),
+    );
   }
   const body = await request.text();
   return new URLSearchParams(body);
