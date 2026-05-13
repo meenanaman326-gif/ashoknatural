@@ -23,6 +23,7 @@ import { Route as AdminRouteImport } from './routes/admin'
 import { Route as AboutRouteImport } from './routes/about'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as ProductsSlugRouteImport } from './routes/products.$slug'
+import { Route as ApiPublicRazorpayCallbackRouteImport } from './routes/api/public/razorpay-callback'
 
 const TermsRoute = TermsRouteImport.update({
   id: '/terms',
@@ -94,6 +95,12 @@ const ProductsSlugRoute = ProductsSlugRouteImport.update({
   path: '/$slug',
   getParentRoute: () => ProductsRoute,
 } as any)
+const ApiPublicRazorpayCallbackRoute =
+  ApiPublicRazorpayCallbackRouteImport.update({
+    id: '/api/public/razorpay-callback',
+    path: '/api/public/razorpay-callback',
+    getParentRoute: () => rootRouteImport,
+  } as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
@@ -110,6 +117,7 @@ export interface FileRoutesByFullPath {
   '/shipping': typeof ShippingRoute
   '/terms': typeof TermsRoute
   '/products/$slug': typeof ProductsSlugRoute
+  '/api/public/razorpay-callback': typeof ApiPublicRazorpayCallbackRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
@@ -126,6 +134,7 @@ export interface FileRoutesByTo {
   '/shipping': typeof ShippingRoute
   '/terms': typeof TermsRoute
   '/products/$slug': typeof ProductsSlugRoute
+  '/api/public/razorpay-callback': typeof ApiPublicRazorpayCallbackRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
@@ -143,6 +152,7 @@ export interface FileRoutesById {
   '/shipping': typeof ShippingRoute
   '/terms': typeof TermsRoute
   '/products/$slug': typeof ProductsSlugRoute
+  '/api/public/razorpay-callback': typeof ApiPublicRazorpayCallbackRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
@@ -161,6 +171,7 @@ export interface FileRouteTypes {
     | '/shipping'
     | '/terms'
     | '/products/$slug'
+    | '/api/public/razorpay-callback'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
@@ -177,6 +188,7 @@ export interface FileRouteTypes {
     | '/shipping'
     | '/terms'
     | '/products/$slug'
+    | '/api/public/razorpay-callback'
   id:
     | '__root__'
     | '/'
@@ -193,6 +205,7 @@ export interface FileRouteTypes {
     | '/shipping'
     | '/terms'
     | '/products/$slug'
+    | '/api/public/razorpay-callback'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -209,6 +222,7 @@ export interface RootRouteChildren {
   ProductsRoute: typeof ProductsRouteWithChildren
   ShippingRoute: typeof ShippingRoute
   TermsRoute: typeof TermsRoute
+  ApiPublicRazorpayCallbackRoute: typeof ApiPublicRazorpayCallbackRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -311,6 +325,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ProductsSlugRouteImport
       parentRoute: typeof ProductsRoute
     }
+    '/api/public/razorpay-callback': {
+      id: '/api/public/razorpay-callback'
+      path: '/api/public/razorpay-callback'
+      fullPath: '/api/public/razorpay-callback'
+      preLoaderRoute: typeof ApiPublicRazorpayCallbackRouteImport
+      parentRoute: typeof rootRouteImport
+    }
   }
 }
 
@@ -340,6 +361,7 @@ const rootRouteChildren: RootRouteChildren = {
   ProductsRoute: ProductsRouteWithChildren,
   ShippingRoute: ShippingRoute,
   TermsRoute: TermsRoute,
+  ApiPublicRazorpayCallbackRoute: ApiPublicRazorpayCallbackRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)

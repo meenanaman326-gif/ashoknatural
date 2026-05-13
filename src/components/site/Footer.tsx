@@ -13,11 +13,16 @@ export function Footer() {
             <span className="font-display text-2xl">Ashok Naturals</span>
           </div>
           <p className="text-sm text-primary-foreground/80 max-w-sm">
-            Stone-ground spices, raw forest honey and natural foods — sourced directly from Indian farms, delivered with love.
+            Stone-ground spices, raw forest honey and natural foods — sourced directly from Indian
+            farms, delivered with love.
           </p>
           <div className="flex gap-3 pt-2">
             {[Instagram, Facebook, Twitter].map((Icon, i) => (
-              <a key={i} href="#" className="w-9 h-9 grid place-items-center rounded-full bg-primary-foreground/10 hover:bg-gold hover:text-gold-foreground transition-colors">
+              <a
+                key={i}
+                href="#"
+                className="w-9 h-9 grid place-items-center rounded-full bg-primary-foreground/10 hover:bg-gold hover:text-gold-foreground transition-colors"
+              >
                 <Icon className="w-4 h-4" />
               </a>
             ))}
@@ -27,31 +32,68 @@ export function Footer() {
         <div>
           <h4 className="font-display text-lg mb-4">Shop</h4>
           <ul className="space-y-2 text-sm text-primary-foreground/80">
-            <li><Link to="/products">All Products</Link></li>
-            <li><Link to="/products" search={{ category: "Whole Spices" } as never}>Whole Spices</Link></li>
-            <li><Link to="/products" search={{ category: "Ground Spices" } as never}>Ground Spices</Link></li>
-            <li><Link to="/products" search={{ category: "Spice Blends" } as never}>Spice Blends</Link></li>
-            <li><Link to="/products" search={{ category: "Natural Foods" } as never}>Natural Foods</Link></li>
+            <li>
+              <Link to="/products">All Products</Link>
+            </li>
+            <li>
+              <Link to="/products" search={{ category: "Whole Spices" } as never}>
+                Whole Spices
+              </Link>
+            </li>
+            <li>
+              <Link to="/products" search={{ category: "Ground Spices" } as never}>
+                Ground Spices
+              </Link>
+            </li>
+            <li>
+              <Link to="/products" search={{ category: "Spice Blends" } as never}>
+                Spice Blends
+              </Link>
+            </li>
+            <li>
+              <Link to="/products" search={{ category: "Natural Foods" } as never}>
+                Natural Foods
+              </Link>
+            </li>
           </ul>
         </div>
 
         <div>
           <h4 className="font-display text-lg mb-4">Help</h4>
           <ul className="space-y-2 text-sm text-primary-foreground/80">
-            <li><Link to="/faq">FAQ</Link></li>
-            <li><Link to="/shipping">Shipping & Returns</Link></li>
-            <li><Link to="/privacy">Privacy Policy</Link></li>
-            <li><Link to="/terms">Terms & Conditions</Link></li>
-            <li><Link to="/admin">Admin</Link></li>
+            <li>
+              <Link to="/faq">FAQ</Link>
+            </li>
+            <li>
+              <Link to="/shipping">Shipping & Returns</Link>
+            </li>
+            <li>
+              <Link to="/privacy">Privacy Policy</Link>
+            </li>
+            <li>
+              <Link to="/terms">Terms & Conditions</Link>
+            </li>
+            <li>
+              <Link to="/admin">Admin</Link>
+            </li>
           </ul>
         </div>
 
         <div>
           <h4 className="font-display text-lg mb-4">Contact</h4>
           <ul className="space-y-3 text-sm text-primary-foreground/80">
-            <li className="flex gap-2"><MapPin className="w-4 h-4 mt-0.5 shrink-0 text-gold" /> 24, Spice Market Rd, Erode, Tamil Nadu 638001</li>
-            <li className="flex gap-2"><Phone className="w-4 h-4 mt-0.5 shrink-0 text-gold" /> +91 98765 43210</li>
-            <li className="flex gap-2"><Mail className="w-4 h-4 mt-0.5 shrink-0 text-gold" /> care@ashoknaturals.in</li>
+            <li className="flex gap-2">
+              <MapPin className="w-4 h-4 mt-0.5 shrink-0 text-gold" />
+              <span>24, Spice Market Rd, Erode, Tamil Nadu 638001</span>
+            </li>
+            <li className="flex gap-2">
+              <Phone className="w-4 h-4 mt-0.5 shrink-0 text-gold" />
+              <span>+91 98765 43210</span>
+            </li>
+            <li className="flex gap-2">
+              <Mail className="w-4 h-4 mt-0.5 shrink-0 text-gold" />
+              <span>care@ashoknaturals.in</span>
+            </li>
           </ul>
         </div>
       </div>
