@@ -5,6 +5,7 @@ import { CreditCard, Wallet, Truck, Lock, CheckCircle2 } from "lucide-react";
 import { useCart, findProduct, inr } from "@/lib/cart-store";
 import { toast } from "sonner";
 import { createRazorpayOrder, verifyRazorpayPayment } from "@/lib/razorpay.functions";
+import { markStoredOrderFailed, markStoredOrderPaid, saveLastOrder, savePendingOrder } from "@/lib/order-storage";
 
 declare global {
   interface Window {
@@ -44,10 +45,13 @@ function Checkout() {
   const gst = Math.round(subtotal * 0.05);
   const total = subtotal + shipping + gst;
 
-  const completeOrder = (paymentInfo: { orderId: string; paymentId?: string; method: string }) => {
-    try {
-      localStorage.setItem("an_last_order", JSON.stringify({ ...paymentInfo, total, items }));
-    } catch {}
+  const completeOrder = (paymentInfo: { orderId: string; paymentId?: string; method: "razorpay" | "cod"; status?: "paid" | "confirmed" }) => {
+    saveLastOrder({
+      ...paymentInfo,
+      status: paymentInfo.status ?? (paymentInfo.method === "cod" ? "confirmed" : "paid"),
+      total,
+      items,
+    });
     clear();
     toast.success("Order placed successfully!");
     navigate({ to: "/order-success", search: { id: paymentInfo.orderId } as never });
@@ -59,7 +63,7 @@ function Checkout() {
 
     if (method === "cod") {
       const orderId = "AN" + Math.floor(100000 + Math.random() * 900000);
-      completeOrder({ orderId, method: "cod" });
+      completeOrder({ orderId, method: "cod", status: "confirmed" });
       return;
     }
 
@@ -72,6 +76,10 @@ function Checkout() {
       if (!order?.orderId || !order?.keyId) throw new Error("Invalid payment order response");
       const form = formRef.current;
       const get = (name: string) => (form?.elements.namedItem(name) as HTMLInputElement | null)?.value ?? "";
+      const isMobile = /Android|iPhone|iPad|iPod|Mobile/i.test(navigator.userAgent) || window.innerWidth < 768;
+      const callbackUrl = `${window.location.origin}/api/public/razorpay-callback`;
+
+      savePendingOrder({ orderId: order.orderId, method: "razorpay", total, items });
 
       const rzp = new window.Razorpay({
         key: order.keyId,
@@ -88,6 +96,9 @@ function Checkout() {
         notes: {
           address: `${get("address1")} ${get("address2")} ${get("city")} ${get("state")} ${get("pincode")}`,
         },
+        callback_url: callbackUrl,
+        redirect_url: callbackUrl,
+        redirect: isMobile,
         theme: { color: "#1f3d2b" },
         retry: { enabled: true, max_count: 2 },
         send_sms_hash: true,
@@ -107,6 +118,7 @@ function Checkout() {
                 signature: response.razorpay_signature,
               },
             });
+            markStoredOrderPaid(response.razorpay_order_id, response.razorpay_payment_id);
             completeOrder({ orderId: response.razorpay_order_id, paymentId: response.razorpay_payment_id, method: "razorpay" });
           } catch (err) {
             console.error(err);
@@ -123,6 +135,7 @@ function Checkout() {
       });
       rzp.on("payment.failed", (resp: unknown) => {
         console.error("Razorpay payment failed:", resp);
+        markStoredOrderFailed(order.orderId, "Payment failed");
         toast.error("Payment failed. Please try again.");
         setProcessing(false);
       });
