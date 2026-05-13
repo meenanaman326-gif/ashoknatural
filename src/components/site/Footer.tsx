@@ -49,9 +49,9 @@ export function Footer() {
         <div>
           <h4 className="font-display text-lg mb-4">Contact</h4>
           <ul className="space-y-3 text-sm text-primary-foreground/80">
-            <li className="flex gap-2"><MapPin className="w-4 h-4 mt-0.5 shrink-0 text-gold" /> 24, Spice Market Rd, Erode, Tamil Nadu 638001</li>
-            <li className="flex gap-2"><Phone className="w-4 h-4 mt-0.5 shrink-0 text-gold" /> +91 98765 43210</li>
-            <li className="flex gap-2"><Mail className="w-4 h-4 mt-0.5 shrink-0 text-gold" /> care@ashoknaturals.in</li>
+            <li className="flex gap-2"><MapPin className="w-4 h-4 mt-0.5 shrink-0 text-gold" /><span>24, Spice Market Rd, Erode, Tamil Nadu 638001</span></li>
+            <li className="flex gap-2"><Phone className="w-4 h-4 mt-0.5 shrink-0 text-gold" /><span>+91 98765 43210</span></li>
+            <li className="flex gap-2"><Mail className="w-4 h-4 mt-0.5 shrink-0 text-gold" /><span>care@ashoknaturals.in</span></li>
           </ul>
         </div>
       </div>
