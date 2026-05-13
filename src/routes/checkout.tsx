@@ -10,6 +10,7 @@ import {
   markStoredOrderPaid,
   saveLastOrder,
   savePendingOrder,
+  getStoredOrder,
 } from "@/lib/order-storage";
 
 declare global {
@@ -49,6 +50,44 @@ function Checkout() {
 
   useEffect(() => {
     loadRazorpayScript();
+
+    // Handle redirect callback — when user returns from UPI app
+    const params = new URLSearchParams(window.location.search);
+    const rzpPaymentId = params.get("razorpay_payment_id");
+    const rzpOrderId = params.get("razorpay_order_id");
+    const rzpSignature = params.get("razorpay_signature");
+
+    if (rzpPaymentId && rzpOrderId) {
+      setProcessing(true);
+      (async () => {
+        try {
+          if (rzpSignature) {
+            await verifyFn({
+              data: {
+                orderId: rzpOrderId,
+                paymentId: rzpPaymentId,
+                signature: rzpSignature,
+              },
+            });
+          }
+          const paid = markStoredOrderPaid(rzpOrderId, rzpPaymentId);
+          saveLastOrder({
+            orderId: rzpOrderId,
+            paymentId: rzpPaymentId,
+            method: "razorpay",
+            status: "paid",
+            total: paid.total,
+            items: paid.items,
+          });
+          clear();
+          toast.success("Payment successful!");
+          navigate({ to: "/order-success", search: { id: rzpOrderId } as never });
+        } catch {
+          toast.error("Payment verification failed. Contact support.");
+          setProcessing(false);
+        }
+      })();
+    }
   }, []);
 
   const shipping = subtotal > 599 ? 0 : 49;
@@ -90,16 +129,30 @@ function Checkout() {
       const order = await createOrderFn({
         data: { amount: total, currency: "INR", receipt: `AN_${Date.now()}` },
       });
-      console.log("[checkout] Razorpay order created", order);
       if (!order?.orderId || !order?.keyId) throw new Error("Invalid payment order response");
+
       const form = formRef.current;
       const get = (name: string) =>
         (form?.elements.namedItem(name) as HTMLInputElement | null)?.value ?? "";
-      const isMobile =
-        /Android|iPhone|iPad|iPod|Mobile/i.test(navigator.userAgent) || window.innerWidth < 768;
-      const callbackUrl = `${window.location.origin}/api/public/razorpay-callback`;
+
+      // Always use redirect mode — fixes UPI/Paytm/GPay on mobile
+      const callbackUrl = `${window.location.origin}/checkout`;
 
       savePendingOrder({ orderId: order.orderId, method: "razorpay", total, items });
+
+      // Polling fallback — if redirect misses, catch payment after return
+      const pollInterval = setInterval(() => {
+        const stored = getStoredOrder(order.orderId);
+        if (stored?.status === "paid") {
+          clearInterval(pollInterval);
+          completeOrder({
+            orderId: order.orderId,
+            paymentId: stored.paymentId,
+            method: "razorpay",
+          });
+        }
+      }, 3000);
+      setTimeout(() => clearInterval(pollInterval), 120000);
 
       const rzp = new window.Razorpay({
         key: order.keyId,
@@ -117,8 +170,7 @@ function Checkout() {
           address: `${get("address1")} ${get("address2")} ${get("city")} ${get("state")} ${get("pincode")}`,
         },
         callback_url: callbackUrl,
-        redirect_url: callbackUrl,
-        redirect: isMobile,
+        redirect: true, // Always redirect — fixes UPI/Paytm/GPay stuck issue
         theme: { color: "#1f3d2b" },
         retry: { enabled: true, max_count: 2 },
         send_sms_hash: true,
@@ -128,12 +180,12 @@ function Checkout() {
             preferences: { show_default_blocks: true },
           },
         },
-        // Do NOT restrict `method` — it disables UPI intent apps (GPay/PhonePe/Paytm) on mobile.
         handler: async (response: {
           razorpay_order_id: string;
           razorpay_payment_id: string;
           razorpay_signature: string;
         }) => {
+          clearInterval(pollInterval);
           try {
             await verifyFn({
               data: {
@@ -156,17 +208,21 @@ function Checkout() {
         },
         modal: {
           ondismiss: () => {
+            clearInterval(pollInterval);
             toast.info("Payment cancelled");
             setProcessing(false);
           },
         },
       });
+
       rzp.on("payment.failed", (resp: unknown) => {
+        clearInterval(pollInterval);
         console.error("Razorpay payment failed:", resp);
         markStoredOrderFailed(order.orderId, "Payment failed");
         toast.error("Payment failed. Please try again.");
         setProcessing(false);
       });
+
       rzp.open();
     } catch (err) {
       console.error(err);
@@ -368,4 +424,4 @@ function Checkout() {
       </form>
     </section>
   );
-}
+        }
