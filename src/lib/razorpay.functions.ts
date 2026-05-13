@@ -1,6 +1,24 @@
 import { createServerFn } from "@tanstack/react-start";
 import { createHmac } from "crypto";
 
+function verifySignature(orderId: string, paymentId: string, signature: string, secret: string) {
+  const expected = createHmac("sha256", secret)
+    .update(`${orderId}|${paymentId}`)
+    .digest("hex");
+  return expected === signature;
+}
+
+function getRazorpayAuth() {
+  const keyId = process.env.RAZORPAY_KEY_ID;
+  const keySecret = process.env.RAZORPAY_KEY_SECRET;
+  if (!keyId || !keySecret) throw new Error("Razorpay keys not configured");
+  return {
+    keyId,
+    keySecret,
+    authorization: `Basic ${Buffer.from(`${keyId}:${keySecret}`).toString("base64")}`,
+  };
+}
+
 export const createRazorpayOrder = createServerFn({ method: "POST" })
   .inputValidator((data: { amount: number; currency?: string; receipt?: string }) => {
     if (!data || typeof data.amount !== "number" || data.amount <= 0) {
@@ -13,15 +31,11 @@ export const createRazorpayOrder = createServerFn({ method: "POST" })
     };
   })
   .handler(async ({ data }) => {
-    const keyId = process.env.RAZORPAY_KEY_ID;
-    const keySecret = process.env.RAZORPAY_KEY_SECRET;
-    if (!keyId || !keySecret) throw new Error("Razorpay keys not configured");
-
-    const auth = Buffer.from(`${keyId}:${keySecret}`).toString("base64");
+    const { keyId, authorization } = getRazorpayAuth();
     const res = await fetch("https://api.razorpay.com/v1/orders", {
       method: "POST",
       headers: {
-        Authorization: `Basic ${auth}`,
+        Authorization: authorization,
         "Content-Type": "application/json",
       },
       body: JSON.stringify({
@@ -49,10 +63,40 @@ export const verifyRazorpayPayment = createServerFn({ method: "POST" })
   .handler(async ({ data }) => {
     const secret = process.env.RAZORPAY_KEY_SECRET;
     if (!secret) throw new Error("Razorpay secret not configured");
-    const expected = createHmac("sha256", secret)
-      .update(`${data.orderId}|${data.paymentId}`)
-      .digest("hex");
-    const valid = expected === data.signature;
+    const valid = verifySignature(data.orderId, data.paymentId, data.signature, secret);
     if (!valid) throw new Error("Payment signature verification failed");
-    return { valid: true, paymentId: data.paymentId, orderId: data.orderId };
+    return { valid: true, paid: true, status: "paid", paymentId: data.paymentId, orderId: data.orderId };
+  });
+
+export const getRazorpayOrderStatus = createServerFn({ method: "POST" })
+  .inputValidator((d: { orderId: string; paymentId?: string; signature?: string }) => {
+    if (!d?.orderId) throw new Error("Missing order id");
+    return d;
+  })
+  .handler(async ({ data }) => {
+    const { keySecret, authorization } = getRazorpayAuth();
+
+    if (data.paymentId && data.signature) {
+      const valid = verifySignature(data.orderId, data.paymentId, data.signature, keySecret);
+      if (valid) return { status: "paid", paid: true, orderId: data.orderId, paymentId: data.paymentId };
+    }
+
+    const res = await fetch(`https://api.razorpay.com/v1/orders/${encodeURIComponent(data.orderId)}`, {
+      headers: { Authorization: authorization },
+    });
+
+    if (!res.ok) {
+      const err = await res.text();
+      console.error("Razorpay status error:", err);
+      throw new Error("Could not check payment status");
+    }
+
+    const order = (await res.json()) as { id: string; status: string; amount_paid?: number; attempts?: number };
+    const paid = order.status === "paid" || (order.amount_paid ?? 0) > 0;
+    return {
+      status: paid ? "paid" : order.status,
+      paid,
+      orderId: order.id,
+      attempts: order.attempts ?? 0,
+    };
   });
