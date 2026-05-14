@@ -1,5 +1,6 @@
 /* eslint-disable */
-// @ts-nocheckimort { createFileRoute, useNavigate } from "@tanstack/react-router";
+// @ts-nocheck
+import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useEffect, useRef, useState } from "react";
 import { useServerFn } from "@tanstack/react-start";
 import { CreditCard, Wallet, Truck, Lock, CheckCircle2, QrCode } from "lucide-react";
@@ -506,7 +507,6 @@ function Checkout() {
                 >
                   <div className="text-2xl">📱</div>
                   <div className="text-xs font-medium">Google Pay</div>
-                  
                 </button>
                 
                 <button
@@ -519,25 +519,37 @@ function Checkout() {
                 >
                   <div className="text-2xl">📱</div>
                   <div className="text-xs font-medium">PhonePe</div>
+                </button>
+                
+                <button
+                  type="button"
+                  onClick={() => {
+                    setSelectedQRApp("paytm");
+                    window.location.href = `paytmmp://upi/pay?pa=ashoknaturals@okhdfcbank&pn=Ashok%20Naturals&am=${total}`;
+                  }}
+                  className="p-2 rounded-lg border border-gray-200 hover:border-green-500 hover:bg-green-50 transition-all"
+                >
+                  <div className="text-2xl">📱</div>
                   <div className="text-xs font-medium">PayTM</div>
                 </button>
               </div>
               
-              <button
-                type="button"
-                onClick={confirmQRPayment}
-                className="w-full bg-green-600 text-white py-3 rounded-lg font-semibold mb-2 hover:bg-green-700 transition-all"
-              >
-                ✅ I have completed the payment
-              </button>
-              
-              <button
-                type="button"
-                onClick={() => setShowQRPayment(false)}
-                className="text-sm text-gray-500 hover:text-gray-700"
-              >
-                Cancel
-              </button>
+              <div className="flex gap-2">
+                <button
+                  type="button"
+                  onClick={() => setShowQRPayment(false)}
+                  className="flex-1 px-4 py-2 rounded-lg border border-gray-300 hover:bg-gray-50 transition-colors"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="button"
+                  onClick={confirmQRPayment}
+                  className="flex-1 px-4 py-2 rounded-lg bg-green-600 text-white hover:bg-green-700 transition-colors"
+                >
+                  I've Made the Payment
+                </button>
+              </div>
             </div>
           </div>
         </div>
@@ -545,5 +557,3 @@ function Checkout() {
     </section>
   );
 }
-
-         
