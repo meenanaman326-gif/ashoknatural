@@ -53,8 +53,7 @@ function Checkout() {
   const [method, setMethod] = useState<"razorpay" | "cod">("razorpay");
   const [processing, setProcessing] = useState(false);
   const [showQRPayment, setShowQRPayment] = useState(false);
-  const [selectedQRApp, setSelectedQRApp] = useState<string>("any");
-  const [qrPaymentConfirmed, setQrPaymentConfirmed] = useState(false);
+  const [copied, setCopied] = useState(false);
   
   const formRef = useRef<HTMLFormElement>(null);
 
@@ -127,7 +126,6 @@ function Checkout() {
 
   const confirmQRPayment = () => {
     const orderId = "AN" + Math.floor(100000 + Math.random() * 900000);
-    setQrPaymentConfirmed(true);
     setShowQRPayment(false);
     
     // Save order as pending (will be confirmed manually)
@@ -145,6 +143,13 @@ function Checkout() {
     clear();
     toast.success("Payment confirmation received! Order placed.");
     navigate({ to: "/order-success", search: { id: orderId } as never });
+  };
+
+  const copyUPIID = () => {
+    navigator.clipboard.writeText("ashoknaturals@okhdfcbank");
+    setCopied(true);
+    toast.success("UPI ID copied!");
+    setTimeout(() => setCopied(false), 2000);
   };
 
   const placeOrder = async (e: React.FormEvent) => {
@@ -356,7 +361,7 @@ function Checkout() {
           <div className="bg-card rounded-2xl p-6 shadow-card">
             <h2 className="font-display text-xl text-primary mb-4">Payment method</h2>
             <div className="space-y-2">
-              {/* QR Code Payment Option - NEW */}
+              {/* QR Code Payment Option */}
               <button
                 type="button"
                 onClick={handleQRPayment}
@@ -364,8 +369,8 @@ function Checkout() {
               >
                 <QrCode className="w-5 h-5 text-green-600 mt-0.5" />
                 <div className="flex-1 text-left">
-                  <p className="font-semibold text-green-800">📱 Scan QR Code & Pay</p>
-                  <p className="text-xs text-gray-600">Pay using any UPI app - Google Pay • PhonePe • PayTM • BHIM</p>
+                  <p className="font-semibold text-green-800">📱 Pay via UPI QR Code</p>
+                  <p className="text-xs text-gray-600">Google Pay • PhonePe • PayTM • BHIM • Any UPI App</p>
                 </div>
                 <div className="text-2xl">📱</div>
               </button>
@@ -471,77 +476,48 @@ function Checkout() {
         </aside>
       </form>
 
-      {/* QR Code Payment Modal */}
+      {/* QR Code Payment Modal - FIXED VERSION */}
       {showQRPayment && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4" onClick={() => setShowQRPayment(false)}>
           <div className="bg-white rounded-2xl max-w-md w-full p-6" onClick={(e) => e.stopPropagation()}>
             <div className="text-center">
-              <h3 className="text-xl font-bold mb-2">Scan & Pay with UPI</h3>
-              <p className="text-gray-500 text-sm mb-4">Powered by Razorpay</p>
+              <h3 className="text-xl font-bold mb-2">Pay with UPI QR Code</h3>
+              <p className="text-gray-500 text-sm mb-4">Scan & pay using any UPI app</p>
               
+              {/* QR Code Image */}
               <div className="bg-gradient-to-r from-green-50 to-green-100 p-4 rounded-xl mb-4">
                 <div className="bg-white p-4 rounded-xl inline-block">
                   <img 
-                    src="https://upload.wikimedia.org/wikipedia/commons/d/d0/QR_code_for_mobile_English_Wikipedia.svg" 
+                    src={`https://quickchart.io/qr?text=upi://pay?pa=ashoknaturals@okhdfcbank&pn=Ashok%20Naturals&am=${total}&cu=INR&size=300&margin=2&ecLevel=H`}
                     alt="UPI QR Code"
                     className="w-48 h-48 mx-auto"
+                    onError={(e) => {
+                      // Fallback if QR generation fails
+                      e.currentTarget.src = `https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=${encodeURIComponent(`upi://pay?pa=ashoknaturals@okhdfcbank&pn=Ashok%20Naturals&am=${total}&cu=INR`)}`;
+                    }}
                   />
                 </div>
                 <p className="text-xs text-gray-600 mt-3">Scan with any UPI app to pay</p>
+                <p className="text-sm font-bold text-green-700 mt-2">Amount: {inr(total)}</p>
               </div>
               
+              {/* UPI ID for manual payment */}
               <div className="bg-gray-50 p-3 rounded-lg mb-4">
-                <p className="text-sm font-medium text-gray-700">UPI ID (Manual Payment):</p>
-                <p className="text-lg font-mono font-bold text-green-700">ashoknaturals@okhdfcbank</p>
-                <p className="text-sm font-bold mt-2">Amount: {inr(total)}</p>
+                <p className="text-sm font-medium text-gray-700">Or pay manually to this UPI ID:</p>
+                <div className="flex items-center justify-between gap-2 mt-2">
+                  <p className="text-base font-mono font-bold text-green-700">ashoknaturals@okhdfcbank</p>
+                  <button
+                    type="button"
+                    onClick={copyUPIID}
+                    className="px-3 py-1 bg-green-600 text-white rounded-lg text-sm hover:bg-green-700 transition-colors"
+                  >
+                    {copied ? "Copied!" : "Copy"}
+                  </button>
+                </div>
               </div>
               
-              <div className="grid grid-cols-3 gap-2 mb-4">
-                <button
-                  type="button"
-                  onClick={() => {
-                    setSelectedQRApp("gpay");
-                    window.location.href = `gpay://upi/pay?pa=ashoknaturals@okhdfcbank&pn=Ashok%20Naturals&am=${total}&cu=INR`;
-                  }}
-                  className="p-2 rounded-lg border border-gray-200 hover:border-green-500 hover:bg-green-50 transition-all"
-                >
-                  <div className="text-2xl">📱</div>
-                  <div className="text-xs font-medium">Google Pay</div>
-                </button>
-                
-                <button
-                  type="button"
-                  onClick={() => {
-                    setSelectedQRApp("phonepe");
-                    window.location.href = `phonepe://pay?pa=ashoknaturals@okhdfcbank&pn=Ashok%20Naturals&am=${total}`;
-                  }}
-                  className="p-2 rounded-lg border border-gray-200 hover:border-green-500 hover:bg-green-50 transition-all"
-                >
-                  <div className="text-2xl">📱</div>
-                  <div className="text-xs font-medium">PhonePe</div>
-                </button>
-                
-                <button
-                  type="button"
-                  onClick={() => {
-                    setSelectedQRApp("paytm");
-                    window.location.href = `paytmmp://upi/pay?pa=ashoknaturals@okhdfcbank&pn=Ashok%20Naturals&am=${total}`;
-                  }}
-                  className="p-2 rounded-lg border border-gray-200 hover:border-green-500 hover:bg-green-50 transition-all"
-                >
-                  <div className="text-2xl">📱</div>
-                  <div className="text-xs font-medium">PayTM</div>
-                </button>
-              </div>
-              
+              {/* Action buttons */}
               <div className="flex gap-2">
-                <button
-                  type="button"
-                  onClick={() => setShowQRPayment(false)}
-                  className="flex-1 px-4 py-2 rounded-lg border border-gray-300 hover:bg-gray-50 transition-colors"
-                >
-                  Cancel
-                </button>
                 <button
                   type="button"
                   onClick={confirmQRPayment}
@@ -550,6 +526,10 @@ function Checkout() {
                   I've Made the Payment
                 </button>
               </div>
+              
+              <p className="text-xs text-gray-500 mt-4">
+                Your order will be confirmed after payment verification
+              </p>
             </div>
           </div>
         </div>
