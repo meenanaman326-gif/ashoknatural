@@ -1,16 +1,36 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useState, useRef, useEffect } from "react";
-import { useCart, inr } from "@/lib/cart-store";
 import { toast } from "sonner";
 
-// Remove useServerFn and all server functions for now
-// We'll use a simpler approach
+// Simple cart store - replace with your actual cart import
+const useCart = () => {
+  const [items, setItems] = useState(() => {
+    const saved = localStorage.getItem("cart");
+    return saved ? JSON.parse(saved) : [];
+  });
+  
+  const subtotal = items.reduce((sum, item) => sum + (item.price * item.quantity), 0);
+  
+  const clear = () => {
+    setItems([]);
+    localStorage.setItem("cart", "[]");
+  };
+  
+  return { items, subtotal, clear };
+};
+
+const inr = (amount: number) => {
+  return new Intl.NumberFormat('en-IN', {
+    style: 'currency',
+    currency: 'INR',
+    minimumFractionDigits: 0,
+  }).format(amount);
+};
 
 export const Route = createFileRoute("/checkout")({
   component: Checkout,
 });
 
-// Simple Razorpay script loader
 function loadRazorpayScript(): Promise<boolean> {
   return new Promise((resolve) => {
     if (typeof window === "undefined") return resolve(false);
@@ -114,12 +134,11 @@ function Checkout() {
       const get = (name: string) =>
         (form?.elements.namedItem(name) as HTMLInputElement | null)?.value ?? "";
 
-      // Create a mock order for demo
-      // In production, replace this with your actual API call
-      const orderId = "ORDER_" + Date.now();
-      const keyId = "rzp_test_your_key_here"; // Replace with your Razorpay key
+      // IMPORTANT: Replace with your actual Razorpay key
+      const RAZORPAY_KEY = "rzp_test_YOUR_KEY_HERE";
+      
+      const orderId = "order_" + Date.now() + "_" + Math.random().toString(36).substr(2, 9);
 
-      // Set timeout for payment
       const timeoutId = setTimeout(() => {
         setPaymentFailed(true);
         setProcessing(false);
@@ -127,8 +146,8 @@ function Checkout() {
       }, 45000);
 
       const options = {
-        key: keyId,
-        amount: total * 100, // Amount in paise
+        key: RAZORPAY_KEY,
+        amount: Math.round(total * 100),
         currency: "INR",
         name: "Ashok Naturals",
         description: "Pure Indian Spices & Natural Foods",
@@ -198,10 +217,10 @@ function Checkout() {
   if (items.length === 0) {
     return (
       <div className="container mx-auto px-4 py-24 text-center">
-        <h1 className="text-3xl font-bold mb-4">Your cart is empty</h1>
+        <h1 className="text-3xl font-bold text-green-800 mb-4">Your cart is empty</h1>
         <button 
-          onClick={() => navigate({ to: "/shop" })} 
-          className="bg-green-700 text-white px-6 py-3 rounded-lg font-semibold"
+          onClick={() => navigate({ to: "/products" })} 
+          className="bg-green-700 text-white px-6 py-3 rounded-lg font-semibold hover:bg-green-800"
         >
           Continue Shopping
         </button>
@@ -210,184 +229,187 @@ function Checkout() {
   }
 
   return (
-    <div className="container mx-auto px-4 py-8 max-w-6xl">
-      <h1 className="text-3xl font-bold text-green-800 mb-8">Checkout</h1>
+    <div className="min-h-screen bg-gray-50 py-8">
+      <div className="container mx-auto px-4 max-w-6xl">
+        <h1 className="text-3xl font-bold text-green-800 mb-8">Checkout</h1>
 
-      <form ref={formRef} onSubmit={placeOrder} className="grid lg:grid-cols-3 gap-8">
-        <div className="lg:col-span-2 space-y-6">
-          {/* Contact Information */}
-          <div className="bg-white p-6 rounded-2xl shadow-sm border">
-            <h2 className="text-xl font-semibold mb-4">Contact Information</h2>
-            <div>
-              <input
-                name="email"
-                type="email"
-                required
-                placeholder="Email address"
-                className={`w-full px-4 py-3 rounded-lg border ${formErrors.email ? 'border-red-500' : 'border-gray-300'}`}
-              />
-              {formErrors.email && <p className="text-red-500 text-sm mt-1">{formErrors.email}</p>}
-            </div>
-            <div className="mt-3">
-              <input
-                name="phone"
-                type="tel"
-                required
-                placeholder="Phone number (10 digits)"
-                className={`w-full px-4 py-3 rounded-lg border ${formErrors.phone ? 'border-red-500' : 'border-gray-300'}`}
-              />
-              {formErrors.phone && <p className="text-red-500 text-sm mt-1">{formErrors.phone}</p>}
-            </div>
-          </div>
-
-          {/* Shipping Address */}
-          <div className="bg-white p-6 rounded-2xl shadow-sm border">
-            <h2 className="text-xl font-semibold mb-4">Shipping Address</h2>
-            <div className="grid md:grid-cols-2 gap-3">
+        <form ref={formRef} onSubmit={placeOrder} className="grid lg:grid-cols-3 gap-8">
+          <div className="lg:col-span-2 space-y-6">
+            {/* Contact Information */}
+            <div className="bg-white p-6 rounded-2xl shadow-sm border">
+              <h2 className="text-xl font-semibold mb-4">Contact Information</h2>
               <div>
                 <input
-                  name="firstName"
+                  name="email"
+                  type="email"
                   required
-                  placeholder="First name"
-                  className={`w-full px-4 py-3 rounded-lg border ${formErrors.firstName ? 'border-red-500' : 'border-gray-300'}`}
+                  placeholder="Email address"
+                  className={`w-full px-4 py-3 rounded-lg border ${formErrors.email ? 'border-red-500' : 'border-gray-300'}`}
                 />
-                {formErrors.firstName && <p className="text-red-500 text-sm mt-1">{formErrors.firstName}</p>}
+                {formErrors.email && <p className="text-red-500 text-sm mt-1">{formErrors.email}</p>}
               </div>
-              <input name="lastName" placeholder="Last name" className="w-full px-4 py-3 rounded-lg border border-gray-300" />
-            </div>
-            <div className="mt-3">
-              <input
-                name="address1"
-                required
-                placeholder="Street address"
-                className={`w-full px-4 py-3 rounded-lg border ${formErrors.address ? 'border-red-500' : 'border-gray-300'}`}
-              />
-              {formErrors.address && <p className="text-red-500 text-sm mt-1">{formErrors.address}</p>}
-            </div>
-            <input name="address2" placeholder="Apartment, suite (optional)" className="w-full px-4 py-3 rounded-lg border border-gray-300 mt-3" />
-            <div className="grid md:grid-cols-3 gap-3 mt-3">
-              <input name="city" placeholder="City" className="w-full px-4 py-3 rounded-lg border border-gray-300" />
-              <input name="state" placeholder="State" className="w-full px-4 py-3 rounded-lg border border-gray-300" />
-              <div>
+              <div className="mt-3">
                 <input
-                  name="pincode"
-                  placeholder="Pincode"
-                  className={`w-full px-4 py-3 rounded-lg border ${formErrors.pincode ? 'border-red-500' : 'border-gray-300'}`}
+                  name="phone"
+                  type="tel"
+                  required
+                  placeholder="Phone number (10 digits)"
+                  className={`w-full px-4 py-3 rounded-lg border ${formErrors.phone ? 'border-red-500' : 'border-gray-300'}`}
                 />
-                {formErrors.pincode && <p className="text-red-500 text-sm mt-1">{formErrors.pincode}</p>}
+                {formErrors.phone && <p className="text-red-500 text-sm mt-1">{formErrors.phone}</p>}
               </div>
             </div>
-          </div>
 
-          {/* Payment Options */}
-          <div className="bg-white p-6 rounded-2xl shadow-sm border">
-            <h2 className="text-xl font-semibold mb-4">Payment Options</h2>
-            
-            <div className="space-y-3">
-              <button
-                type="button"
-                onClick={() => setMethod("razorpay")}
-                className={`w-full text-left p-4 rounded-xl border-2 transition-all ${
-                  method === "razorpay" ? "border-green-500 bg-green-50" : "border-gray-200"
-                }`}
-              >
-                <div className="font-bold text-lg">📱 UPI / Card / NetBanking</div>
-                <div className="text-sm text-gray-500">Google Pay • PhonePe • PayTM • Credit/Debit Card</div>
-              </button>
-
-              <button
-                type="button"
-                onClick={() => setMethod("cod")}
-                className={`w-full text-left p-4 rounded-xl border-2 transition-all ${
-                  method === "cod" ? "border-green-500 bg-green-50" : "border-gray-200"
-                }`}
-              >
-                <div className="font-bold text-lg">💰 Cash on Delivery</div>
-                <div className="text-sm text-gray-500">Pay when you receive your order</div>
-              </button>
-            </div>
-
-            {paymentFailed && method === "razorpay" && (
-              <div className="mt-4 p-4 bg-red-50 rounded-xl border border-red-200">
-                <p className="text-red-800 font-medium">⚠️ Payment Issue</p>
-                <p className="text-sm text-gray-600 mb-3">You can still complete your order:</p>
-                <div className="flex gap-3">
-                  <button
-                    type="button"
-                    onClick={placeRazorpayOrder}
-                    className="px-4 py-2 bg-green-600 text-white rounded-lg text-sm"
-                  >
-                    🔄 Retry Payment
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setMethod("cod")}
-                    className="px-4 py-2 bg-gray-600 text-white rounded-lg text-sm"
-                  >
-                    💰 Switch to COD
-                  </button>
+            {/* Shipping Address */}
+            <div className="bg-white p-6 rounded-2xl shadow-sm border">
+              <h2 className="text-xl font-semibold mb-4">Shipping Address</h2>
+              <div className="grid md:grid-cols-2 gap-3">
+                <div>
+                  <input
+                    name="firstName"
+                    required
+                    placeholder="First name"
+                    className={`w-full px-4 py-3 rounded-lg border ${formErrors.firstName ? 'border-red-500' : 'border-gray-300'}`}
+                  />
+                  {formErrors.firstName && <p className="text-red-500 text-sm mt-1">{formErrors.firstName}</p>}
                 </div>
+                <input name="lastName" placeholder="Last name" className="w-full px-4 py-3 rounded-lg border border-gray-300" />
               </div>
-            )}
-
-            {processing && method === "razorpay" && !paymentFailed && (
-              <div className="mt-4 p-4 bg-blue-50 rounded-xl text-center">
-                <div className="animate-spin text-2xl mb-2">⏳</div>
-                <p className="text-blue-800">Opening payment window...</p>
+              <div className="mt-3">
+                <input
+                  name="address1"
+                  required
+                  placeholder="Street address"
+                  className={`w-full px-4 py-3 rounded-lg border ${formErrors.address ? 'border-red-500' : 'border-gray-300'}`}
+                />
+                {formErrors.address && <p className="text-red-500 text-sm mt-1">{formErrors.address}</p>}
               </div>
-            )}
-          </div>
-
-          {/* Security Notice */}
-          <div className="bg-green-50 p-4 rounded-xl flex items-center gap-3 text-sm text-green-800">
-            <span>🔒</span>
-            <span>100% Secure Payments • UPI • Cards • NetBanking</span>
-          </div>
-        </div>
-
-        {/* Order Summary */}
-        <div className="lg:col-span-1">
-          <div className="bg-white p-6 rounded-2xl shadow-sm border sticky top-4">
-            <h2 className="text-xl font-semibold mb-4">Order Summary</h2>
-            
-            <div className="space-y-2">
-              <div className="flex justify-between">
-                <span>Subtotal ({items.length} items)</span>
-                <span>{inr(subtotal)}</span>
-              </div>
-              <div className="flex justify-between">
-                <span>Shipping</span>
-                <span>{shipping === 0 ? "FREE" : inr(shipping)}</span>
-              </div>
-              <div className="flex justify-between">
-                <span>GST (5%)</span>
-                <span>{inr(gst)}</span>
-              </div>
-              <div className="border-t pt-2 mt-2">
-                <div className="flex justify-between font-bold text-lg">
-                  <span>Total</span>
-                  <span>{inr(total)}</span>
+              <input name="address2" placeholder="Apartment, suite (optional)" className="w-full px-4 py-3 rounded-lg border border-gray-300 mt-3" />
+              <div className="grid md:grid-cols-3 gap-3 mt-3">
+                <input name="city" placeholder="City" className="w-full px-4 py-3 rounded-lg border border-gray-300" />
+                <input name="state" placeholder="State" className="w-full px-4 py-3 rounded-lg border border-gray-300" />
+                <div>
+                  <input
+                    name="pincode"
+                    placeholder="Pincode"
+                    className={`w-full px-4 py-3 rounded-lg border ${formErrors.pincode ? 'border-red-500' : 'border-gray-300'}`}
+                  />
+                  {formErrors.pincode && <p className="text-red-500 text-sm mt-1">{formErrors.pincode}</p>}
                 </div>
               </div>
             </div>
 
-            <button
-              type="submit"
-              disabled={processing}
-              className="w-full mt-6 bg-green-700 text-white py-3 rounded-lg font-semibold hover:bg-green-800 disabled:opacity-50"
-            >
-              {processing ? "Processing..." : `Place Order • ${inr(total)}`}
-            </button>
-            
-            <p className="text-center text-xs text-gray-500 mt-4">
-              By placing your order, you agree to our Terms of Service
-            </p>
-          </div>
-        </div>
-      </form>
-    </div>
-    );
+            {/* Payment Options */}
+            <div className="bg-white p-6 rounded-2xl shadow-sm border">
+              <h2 className="text-xl font-semibold mb-4">Payment Options</h2>
+              
+              <div className="space-y-3">
+                <button
+                  type="button"
+                  onClick={() => setMethod("razorpay")}
+                  className={`w-full text-left p-4 rounded-xl border-2 transition-all ${
+                    method === "razorpay" ? "border-green-500 bg-green-50" : "border-gray-200"
+                  }`}
+                >
+                  <div className="font-bold text-lg">📱 UPI / Card / NetBanking</div>
+                  <div className="text-sm text-gray-500">Google Pay • PhonePe • PayTM • Credit/Debit Card</div>
+                </button>
 
-}
+                <button
+                  type="button"
+                  onClick={() => setMethod("cod")}
+                  className={`w-full text-left p-4 rounded-xl border-2 transition-all ${
+                    method === "cod" ? "border-green-500 bg-green-50" : "border-gray-200"
+                  }`}
+                >
+                  <div className="font-bold text-lg">💰 Cash on Delivery</div>
+                  <div className="text-sm text-gray-500">Pay when you receive your order</div>
+                </button>
+              </div>
+
+              {paymentFailed && method === "razorpay" && (
+                <div className="mt-4 p-4 bg-red-50 rounded-xl border border-red-200">
+                  <p className="text-red-800 font-medium">⚠️ Payment Issue</p>
+                  <p className="text-sm text-gray-600 mb-3">You can still complete your order:</p>
+                  <div className="flex gap-3">
+                    <button
+                      type="button"
+                      onClick={placeRazorpayOrder}
+                      className="px-4 py-2 bg-green-600 text-white rounded-lg text-sm hover:bg-green-700"
+                    >
+                      🔄 Retry Payment
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setMethod("cod")}
+                      className="px-4 py-2 bg-gray-600 text-white rounded-lg text-sm hover:bg-gray-700"
+                    >
+                      💰 Switch to COD
+                    </button>
+                  </div>
+                </div>
+              )}
+
+              {processing && method === "razorpay" && !paymentFailed && (
+                <div className="mt-4 p-4 bg-blue-50 rounded-xl text-center">
+                  <div className="animate-spin text-2xl mb-2">⏳</div>
+                  <p className="text-blue-800">Opening payment window...</p>
+                </div>
+              )}
+            </div>
+
+            {/* Security Notice */}
+            <div className="bg-green-50 p-4 rounded-xl flex items-center gap-3 text-sm text-green-800">
+              <span>🔒</span>
+              <span>100% Secure Payments • UPI • Cards • NetBanking</span>
+            </div>
+          </div>
+
+          {/* Order Summary */}
+          <div className="lg:col-span-1">
+            <div className="bg-white p-6 rounded-2xl shadow-sm border sticky top-4">
+              <h2 className="text-xl font-semibold mb-4">Order Summary</h2>
+              
+              <div className="space-y-2">
+                <div className="flex justify-between">
+                  <span>Subtotal ({items.length} items)</span>
+                  <span>{inr(subtotal)}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span>Shipping</span>
+                  <span>{shipping === 0 ? "FREE" : inr(shipping)}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span>GST (5%)</span>
+                  <span>{inr(gst)}</span>
+                </div>
+                <div className="border-t pt-2 mt-2">
+                  <div className="flex justify-between font-bold text-lg">
+                    <span>Total</span>
+                    <span className="text-green-700">{inr(total)}</span>
+                  </div>
+                </div>
+              </div>
+
+              <button
+                type="submit"
+                disabled={processing}
+                className="w-full mt-6 bg-green-700 text-white py-3 rounded-lg font-semibold hover:bg-green-800 disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                {processing ? "Processing..." : `Place Order • ${inr(total)}`}
+              </button>
+              
+              <p className="text-center text-xs text-gray-500 mt-4">
+                By placing your order, you agree to our Terms of Service
+              </p>
+            </div>
+          </div>
+        </form>
+      </div>
+    </div> 
   );
 }
+  
+    
+    
+  
