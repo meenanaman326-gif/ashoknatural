@@ -1,31 +1,7 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useState, useRef, useEffect } from "react";
 import { toast } from "sonner";
-
-// Simple cart store - replace with your actual cart import
-const useCart = () => {
-  const [items, setItems] = useState(() => {
-    const saved = localStorage.getItem("cart");
-    return saved ? JSON.parse(saved) : [];
-  });
-  
-  const subtotal = items.reduce((sum, item) => sum + (item.price * item.quantity), 0);
-  
-  const clear = () => {
-    setItems([]);
-    localStorage.setItem("cart", "[]");
-  };
-  
-  return { items, subtotal, clear };
-};
-
-const inr = (amount: number) => {
-  return new Intl.NumberFormat('en-IN', {
-    style: 'currency',
-    currency: 'INR',
-    minimumFractionDigits: 0,
-  }).format(amount);
-};
+import { useCart, inr } from "@/lib/cart-store";  // IMPORTANT: Use YOUR actual cart
 
 export const Route = createFileRoute("/checkout")({
   component: Checkout,
@@ -45,6 +21,7 @@ function loadRazorpayScript(): Promise<boolean> {
 }
 
 function Checkout() {
+  // Use YOUR actual cart - NOT a fake one
   const { items, subtotal, clear } = useCart();
   const navigate = useNavigate();
 
@@ -58,6 +35,10 @@ function Checkout() {
   const shipping = subtotal > 599 ? 0 : 49;
   const gst = Math.round(subtotal * 0.05);
   const total = subtotal + shipping + gst;
+
+  // Debug: Check if cart has items
+  console.log("Cart items:", items);
+  console.log("Subtotal:", subtotal);
 
   const validateForm = (): boolean => {
     const form = formRef.current;
@@ -103,7 +84,7 @@ function Checkout() {
 
   const completeOrder = (orderId: string, paymentId?: string) => {
     saveOrder(orderId, paymentId);
-    clear();
+    clear(); // This clears YOUR actual cart
     toast.success(method === "cod" ? "Order placed successfully!" : "Payment successful!");
     navigate({ to: "/order-success", search: { id: orderId } as never });
   };
@@ -117,7 +98,6 @@ function Checkout() {
     setPaymentFailed(false);
     
     try {
-      // Load script with retry
       let scriptLoaded = false;
       for (let i = 0; i < 3; i++) {
         scriptLoaded = await loadRazorpayScript();
@@ -129,7 +109,6 @@ function Checkout() {
         throw new Error("Payment gateway failed to load");
       }
 
-      // Get form data
       const form = formRef.current;
       const get = (name: string) =>
         (form?.elements.namedItem(name) as HTMLInputElement | null)?.value ?? "";
@@ -214,7 +193,8 @@ function Checkout() {
     }
   };
 
-  if (items.length === 0) {
+  // Show loading or empty cart message
+  if (!items || items.length === 0) {
     return (
       <div className="container mx-auto px-4 py-24 text-center">
         <h1 className="text-3xl font-bold text-green-800 mb-4">Your cart is empty</h1>
@@ -232,6 +212,17 @@ function Checkout() {
     <div className="min-h-screen bg-gray-50 py-8">
       <div className="container mx-auto px-4 max-w-6xl">
         <h1 className="text-3xl font-bold text-green-800 mb-8">Checkout</h1>
+
+        {/* Show cart items */}
+        <div className="mb-6 bg-white p-4 rounded-xl">
+          <h3 className="font-semibold mb-2">Items in your cart ({items.length})</h3>
+          {items.map((item: any, idx: number) => (
+            <div key={idx} className="flex justify-between text-sm py-1">
+              <span>{item.name || item.title} x {item.quantity}</span>
+              <span>{inr((item.price || item.price) * item.quantity)}</span>
+            </div>
+          ))}
+        </div>
 
         <form ref={formRef} onSubmit={placeOrder} className="grid lg:grid-cols-3 gap-8">
           <div className="lg:col-span-2 space-y-6">
@@ -406,10 +397,6 @@ function Checkout() {
           </div>
         </form>
       </div>
-    </div> 
+    </div>
   );
-}
-  
-    
-    
-  
+              }
