@@ -1,7 +1,7 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useEffect, useRef, useState } from "react";
 import { useServerFn } from "@tanstack/react-start";
-import { CreditCard, Wallet, Truck, Lock, CheckCircle2 } from "lucide-react";
+import { CreditCard, Wallet, Truck, Lock, CheckCircle2, Sparkles } from "lucide-react";
 import { useCart, findProduct, inr } from "@/lib/cart-store";
 import { toast } from "sonner";
 import {
@@ -52,6 +52,7 @@ function Checkout() {
 
   const [method, setMethod] = useState<"razorpay" | "cod">("razorpay");
   const [processing, setProcessing] = useState(false);
+  const [formErrors, setFormErrors] = useState<Record<string, string>>({});
 
   const formRef = useRef<HTMLFormElement>(null);
 
@@ -108,6 +109,40 @@ function Checkout() {
   const gst = Math.round(subtotal * 0.05);
   const total = subtotal + shipping + gst;
 
+  const validateForm = (): boolean => {
+    const form = formRef.current;
+    if (!form) return false;
+
+    const errors: Record<string, string> = {};
+    
+    const email = (form.elements.namedItem("email") as HTMLInputElement)?.value;
+    const phone = (form.elements.namedItem("phone") as HTMLInputElement)?.value;
+    const firstName = (form.elements.namedItem("firstName") as HTMLInputElement)?.value;
+    const lastName = (form.elements.namedItem("lastName") as HTMLInputElement)?.value;
+    const address = (form.elements.namedItem("address1") as HTMLInputElement)?.value;
+    const city = (form.elements.namedItem("city") as HTMLInputElement)?.value;
+    const state = (form.elements.namedItem("state") as HTMLInputElement)?.value;
+    const pincode = (form.elements.namedItem("pincode") as HTMLInputElement)?.value;
+
+    if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+      errors.email = "Valid email is required";
+    }
+    if (!phone || !/^\d{10}$/.test(phone)) {
+      errors.phone = "Valid 10-digit phone number is required";
+    }
+    if (!firstName) errors.firstName = "First name is required";
+    if (!lastName) errors.lastName = "Last name is required";
+    if (!address) errors.address = "Address is required";
+    if (!city) errors.city = "City is required";
+    if (!state) errors.state = "State is required";
+    if (!pincode || !/^\d{6}$/.test(pincode)) {
+      errors.pincode = "Valid 6-digit pincode is required";
+    }
+
+    setFormErrors(errors);
+    return Object.keys(errors).length === 0;
+  };
+
   const completeOrder = (paymentInfo: {
     orderId: string;
     paymentId?: string;
@@ -134,11 +169,19 @@ function Checkout() {
 
   const placeOrder = async (e: React.FormEvent) => {
     e.preventDefault();
+    
+    if (!validateForm()) {
+      toast.error("Please fill all required fields correctly");
+      return;
+    }
+
     setProcessing(true);
 
     if (method === "cod") {
       const orderId = "AN" + Math.floor(100000 + Math.random() * 900000);
-      completeOrder({ orderId, method: "cod", status: "confirmed" });
+      setTimeout(() => {
+        completeOrder({ orderId, method: "cod", status: "confirmed" });
+      }, 500);
       return;
     }
 
@@ -172,9 +215,12 @@ function Checkout() {
         items,
       });
 
+      let completed = false;
+
       const pollInterval = setInterval(() => {
         const stored = getStoredOrder(order.orderId);
-        if (stored?.status === "paid") {
+        if (stored?.status === "paid" && !completed) {
+          completed = true;
           clearInterval(pollInterval);
 
           completeOrder({
@@ -185,7 +231,9 @@ function Checkout() {
         }
       }, 3000);
 
-      setTimeout(() => clearInterval(pollInterval), 120000);
+      setTimeout(() => {
+        if (!completed) clearInterval(pollInterval);
+      }, 120000);
 
       const rzp = new window.Razorpay({
         key: order.keyId,
@@ -216,6 +264,8 @@ function Checkout() {
         },
 
         handler: async (response) => {
+          if (completed) return;
+          completed = true;
           clearInterval(pollInterval);
 
           try {
@@ -245,18 +295,22 @@ function Checkout() {
 
         modal: {
           ondismiss: () => {
-            clearInterval(pollInterval);
-            toast.info("Payment cancelled");
-            setProcessing(false);
+            if (!completed) {
+              clearInterval(pollInterval);
+              toast.info("Payment cancelled");
+              setProcessing(false);
+            }
           },
         },
       });
 
       rzp.on("payment.failed", (resp) => {
-        clearInterval(pollInterval);
-        markStoredOrderFailed(order.orderId, "Payment failed");
-        toast.error("Payment failed");
-        setProcessing(false);
+        if (!completed) {
+          clearInterval(pollInterval);
+          markStoredOrderFailed(order.orderId, "Payment failed");
+          toast.error("Payment failed. Please try again.");
+          setProcessing(false);
+        }
       });
 
       rzp.open();
@@ -272,6 +326,12 @@ function Checkout() {
         <h1 className="font-display text-3xl text-primary">
           Your cart is empty
         </h1>
+        <button
+          onClick={() => navigate({ to: "/shop" })}
+          className="btn mt-4"
+        >
+          Continue Shopping
+        </button>
       </section>
     );
   }
@@ -282,64 +342,246 @@ function Checkout() {
 
       <form ref={formRef} onSubmit={placeOrder} className="grid lg:grid-cols-3 gap-8">
         <div className="lg:col-span-2 space-y-6">
-
           {/* Contact */}
-          <div className="bg-card p-6 rounded-2xl">
-            <h2 className="text-xl mb-4">Contact</h2>
-            <input name="email" required placeholder="Email" className="input" />
-            <input name="phone" required placeholder="Phone" className="input mt-2" />
+          <div className="bg-card p-6 rounded-2xl border border-border">
+            <h2 className="text-xl font-semibold mb-4 flex items-center gap-2">
+              <span>📞</span> Contact Information
+            </h2>
+            <div>
+              <input 
+                name="email" 
+                type="email"
+                required 
+                placeholder="Email address" 
+                className={`input w-full ${formErrors.email ? 'border-red-500' : ''}`}
+              />
+              {formErrors.email && (
+                <p className="text-red-500 text-sm mt-1">{formErrors.email}</p>
+              )}
+            </div>
+            <div className="mt-3">
+              <input 
+                name="phone" 
+                type="tel"
+                required 
+                placeholder="Phone number (10 digits)" 
+                className={`input w-full ${formErrors.phone ? 'border-red-500' : ''}`}
+              />
+              {formErrors.phone && (
+                <p className="text-red-500 text-sm mt-1">{formErrors.phone}</p>
+              )}
+            </div>
           </div>
 
           {/* Shipping */}
-          <div className="bg-card p-6 rounded-2xl">
-            <h2 className="text-xl mb-4">Shipping</h2>
-
-            <input name="firstName" required placeholder="First name" className="input" />
-            <input name="lastName" required placeholder="Last name" className="input mt-2" />
-            <input name="address1" required placeholder="Address" className="input mt-2" />
-            <input name="city" required placeholder="City" className="input mt-2" />
-            <input name="state" required placeholder="State" className="input mt-2" />
-            <input name="pincode" required placeholder="Pincode" className="input mt-2" />
+          <div className="bg-card p-6 rounded-2xl border border-border">
+            <h2 className="text-xl font-semibold mb-4 flex items-center gap-2">
+              <span>🚚</span> Shipping Address
+            </h2>
+            <div className="grid md:grid-cols-2 gap-3">
+              <div>
+                <input 
+                  name="firstName" 
+                  required 
+                  placeholder="First name" 
+                  className={`input w-full ${formErrors.firstName ? 'border-red-500' : ''}`}
+                />
+                {formErrors.firstName && (
+                  <p className="text-red-500 text-sm mt-1">{formErrors.firstName}</p>
+                )}
+              </div>
+              <div>
+                <input 
+                  name="lastName" 
+                  required 
+                  placeholder="Last name" 
+                  className={`input w-full ${formErrors.lastName ? 'border-red-500' : ''}`}
+                />
+                {formErrors.lastName && (
+                  <p className="text-red-500 text-sm mt-1">{formErrors.lastName}</p>
+                )}
+              </div>
+            </div>
+            <div className="mt-3">
+              <input 
+                name="address1" 
+                required 
+                placeholder="Street address" 
+                className={`input w-full ${formErrors.address ? 'border-red-500' : ''}`}
+              />
+              {formErrors.address && (
+                <p className="text-red-500 text-sm mt-1">{formErrors.address}</p>
+              )}
+            </div>
+            <input name="address2" placeholder="Apartment, suite, etc. (optional)" className="input w-full mt-3" />
+            <div className="grid md:grid-cols-3 gap-3 mt-3">
+              <div>
+                <input 
+                  name="city" 
+                  required 
+                  placeholder="City" 
+                  className={`input w-full ${formErrors.city ? 'border-red-500' : ''}`}
+                />
+                {formErrors.city && (
+                  <p className="text-red-500 text-sm mt-1">{formErrors.city}</p>
+                )}
+              </div>
+              <div>
+                <input 
+                  name="state" 
+                  required 
+                  placeholder="State" 
+                  className={`input w-full ${formErrors.state ? 'border-red-500' : ''}`}
+                />
+                {formErrors.state && (
+                  <p className="text-red-500 text-sm mt-1">{formErrors.state}</p>
+                )}
+              </div>
+              <div>
+                <input 
+                  name="pincode" 
+                  type="text"
+                  required 
+                  placeholder="Pincode" 
+                  className={`input w-full ${formErrors.pincode ? 'border-red-500' : ''}`}
+                />
+                {formErrors.pincode && (
+                  <p className="text-red-500 text-sm mt-1">{formErrors.pincode}</p>
+                )}
+              </div>
+            </div>
           </div>
 
           {/* Payment */}
-          <div className="bg-card p-6 rounded-2xl">
-            <h2 className="text-xl mb-4">Payment</h2>
+          <div className="bg-card p-6 rounded-2xl border border-border">
+            <h2 className="text-xl font-semibold mb-4 flex items-center gap-2">
+              <span>💳</span> Payment Method
+            </h2>
+            
+            <div className="space-y-3">
+              {/* Razorpay Option */}
+              <label 
+                className={`flex items-center justify-between p-4 rounded-xl border-2 cursor-pointer transition-all ${
+                  method === "razorpay" 
+                    ? "border-green-500 bg-green-50" 
+                    : "border-border hover:border-gray-300"
+                }`}
+                onClick={() => setMethod("razorpay")}
+              >
+                <div className="flex items-center gap-3">
+                  <input
+                    type="radio"
+                    name="paymentMethod"
+                    checked={method === "razorpay"}
+                    onChange={() => setMethod("razorpay")}
+                    className="w-4 h-4"
+                  />
+                  <div>
+                    <div className="font-semibold flex items-center gap-2">
+                      Pay Online 
+                      <Sparkles className="w-4 h-4 text-green-600" />
+                    </div>
+                    <div className="text-sm text-gray-500">Credit/Debit Card • UPI • NetBanking • Wallet</div>
+                  </div>
+                </div>
+                <div className="flex gap-2">
+                  <img src="https://img.icons8.com/color/24/visa.png" alt="visa" className="w-6 h-6" />
+                  <img src="https://img.icons8.com/color/24/mastercard.png" alt="mastercard" className="w-6 h-6" />
+                  <span className="text-xs text-gray-400">+ More</span>
+                </div>
+              </label>
 
-            <label>
-              <input
-                type="radio"
-                checked={method === "razorpay"}
-                onChange={() => setMethod("razorpay")}
-              />
-              Pay Online
-            </label>
+              {/* COD Option */}
+              <label 
+                className={`flex items-center gap-3 p-4 rounded-xl border-2 cursor-pointer transition-all ${
+                  method === "cod" 
+                    ? "border-green-500 bg-green-50" 
+                    : "border-border hover:border-gray-300"
+                }`}
+                onClick={() => setMethod("cod")}
+              >
+                <input
+                  type="radio"
+                  name="paymentMethod"
+                  checked={method === "cod"}
+                  onChange={() => setMethod("cod")}
+                  className="w-4 h-4"
+                />
+                <div>
+                  <div className="font-semibold">Cash on Delivery</div>
+                  <div className="text-sm text-gray-500">Pay when you receive your order</div>
+                </div>
+              </label>
 
-            <label>
-              <input
-                type="radio"
-                checked={method === "cod"}
-                onChange={() => setMethod("cod")}
-              />
-              Cash on Delivery
-            </label>
+              {/* Recommended Badge for UPI Options */}
+              <div className="mt-4 p-4 bg-amber-50 rounded-xl border border-amber-200">
+                <div className="flex items-center gap-2 text-amber-800 mb-2">
+                  <span className="text-sm font-semibold">⭐ Recommended</span>
+                </div>
+                <div className="flex gap-3 text-sm text-gray-600">
+                  <span>📱 Google Pay</span>
+                  <span>📱 PhonePe</span>
+                  <span>📱 PayTM</span>
+                </div>
+                <p className="text-xs text-gray-500 mt-2">Quick & secure payments via UPI</p>
+              </div>
+            </div>
+          </div>
+
+          {/* Security Notice */}
+          <div className="bg-green-50 p-4 rounded-xl flex items-center gap-3 text-sm text-green-800">
+            <Lock className="w-5 h-5" />
+            <span>Your payment information is processed securely. We do not store your card details.</span>
           </div>
         </div>
 
         {/* Summary */}
-        <aside className="bg-card p-6 rounded-2xl">
-          <h2 className="text-xl">Order Summary</h2>
+        <aside className="bg-card p-6 rounded-2xl border border-border h-fit sticky top-4">
+          <h2 className="text-xl font-semibold mb-4">Order Summary</h2>
+          
+          <div className="space-y-2 text-sm">
+            <div className="flex justify-between">
+              <span className="text-gray-600">Subtotal ({items.length} items)</span>
+              <span>{inr(subtotal)}</span>
+            </div>
+            <div className="flex justify-between">
+              <span className="text-gray-600">Shipping</span>
+              <span>{shipping === 0 ? 'FREE' : inr(shipping)}</span>
+            </div>
+            <div className="flex justify-between">
+              <span className="text-gray-600">GST (5%)</span>
+              <span>{inr(gst)}</span>
+            </div>
+            <div className="border-t pt-2 mt-2">
+              <div className="flex justify-between font-bold text-lg">
+                <span>Total</span>
+                <span>{inr(total)}</span>
+              </div>
+              {shipping === 0 && (
+                <p className="text-green-600 text-xs mt-1">✨ Free shipping applied!</p>
+              )}
+            </div>
+          </div>
 
-          <p>Subtotal: {inr(subtotal)}</p>
-          <p>Shipping: {shipping}</p>
-          <p>GST: {inr(gst)}</p>
-          <p className="font-bold">Total: {inr(total)}</p>
-
-          <button type="submit" disabled={processing} className="btn w-full mt-4">
-            {processing ? "Processing..." : "Place Order"}
+          <button 
+            type="submit" 
+            disabled={processing} 
+            className="btn w-full mt-6 bg-primary text-white py-3 rounded-xl font-semibold hover:bg-primary/90 transition disabled:opacity-50"
+          >
+            {processing ? (
+              <span className="flex items-center justify-center gap-2">
+                <span className="animate-spin">⏳</span> Processing...
+              </span>
+            ) : (
+              `Place Order • ${inr(total)}`
+            )}
           </button>
+
+          <p className="text-center text-xs text-gray-500 mt-4">
+            By placing your order, you agree to our Terms of Service and Privacy Policy
+          </p>
         </aside>
       </form>
     </section>
   );
-}
+  }
