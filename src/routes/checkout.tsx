@@ -1,15 +1,13 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useEffect, useRef, useState } from "react";
 import { useServerFn } from "@tanstack/react-start";
-import { CreditCard, Wallet, Truck, Lock, CheckCircle2, Sparkles } from "lucide-react";
-import { useCart, findProduct, inr } from "@/lib/cart-store";
+import { useCart, inr } from "@/lib/cart-store";
 import { toast } from "sonner";
 import {
   createRazorpayOrder,
   verifyRazorpayPayment,
 } from "@/lib/razorpay.functions";
 import {
-  markStoredOrderFailed,
   markStoredOrderPaid,
   saveLastOrder,
   savePendingOrder,
@@ -39,7 +37,6 @@ function loadRazorpayScript(): Promise<boolean> {
     script.src = "https://checkout.razorpay.com/v1/checkout.js";
     script.onload = () => resolve(true);
     script.onerror = () => resolve(false);
-
     document.body.appendChild(script);
   });
 }
@@ -50,60 +47,49 @@ function Checkout() {
   const createOrderFn = useServerFn(createRazorpayOrder);
   const verifyFn = useServerFn(verifyRazorpayPayment);
 
-  const [method, setMethod] = useState<"razorpay" | "cod">("razorpay");
+  const [method, setMethod] = useState<"razorpay" | "cod">("cod");
   const [processing, setProcessing] = useState(false);
+  const [paymentTimeout, setPaymentTimeout] = useState(false);
   const [formErrors, setFormErrors] = useState<Record<string, string>>({});
+  const [retryCount, setRetryCount] = useState(0);
 
   const formRef = useRef<HTMLFormElement>(null);
 
+  // Handle payment return from Razorpay
   useEffect(() => {
-    loadRazorpayScript();
-
     const params = new URLSearchParams(window.location.search);
     const rzpPaymentId = params.get("razorpay_payment_id");
     const rzpOrderId = params.get("razorpay_order_id");
     const rzpSignature = params.get("razorpay_signature");
 
-    if (rzpPaymentId && rzpOrderId) {
-      setProcessing(true);
-
-      (async () => {
-        try {
-          if (rzpSignature) {
-            await verifyFn({
-              data: {
-                orderId: rzpOrderId,
-                paymentId: rzpPaymentId,
-                signature: rzpSignature,
-              },
-            });
-          }
-
-          const paid = markStoredOrderPaid(rzpOrderId, rzpPaymentId);
-
-          saveLastOrder({
-            orderId: rzpOrderId,
-            paymentId: rzpPaymentId,
-            method: "razorpay",
-            status: "paid",
-            total: paid.total,
-            items: paid.items,
-          });
-
-          clear();
-          toast.success("Payment successful!");
-
-          navigate({
-            to: "/order-success",
-            search: { id: rzpOrderId } as never,
-          });
-        } catch {
-          toast.error("Payment verification failed.");
-          setProcessing(false);
-        }
-      })();
+    if (rzpPaymentId && rzpOrderId && rzpSignature) {
+      handlePaymentReturn(rzpOrderId, rzpPaymentId, rzpSignature);
     }
   }, []);
+
+  const handlePaymentReturn = async (orderId: string, paymentId: string, signature: string) => {
+    setProcessing(true);
+    try {
+      await verifyFn({ data: { orderId, paymentId, signature } });
+      
+      saveLastOrder({
+        orderId,
+        paymentId,
+        method: "razorpay",
+        status: "paid",
+        total,
+        items,
+      });
+
+      clear();
+      toast.success("Payment successful!");
+      navigate({ to: "/order-success", search: { id: orderId } as never });
+    } catch (error) {
+      console.error("Verification error:", error);
+      toast.error("Payment verification failed. Please contact support.");
+      setProcessing(false);
+    }
+  };
 
   const shipping = subtotal > 599 ? 0 : 49;
   const gst = Math.round(subtotal * 0.05);
@@ -147,24 +133,110 @@ function Checkout() {
     orderId: string;
     paymentId?: string;
     method: "razorpay" | "cod";
-    status?: "paid" | "confirmed";
   }) => {
     saveLastOrder({
       ...paymentInfo,
-      status:
-        paymentInfo.status ??
-        (paymentInfo.method === "cod" ? "confirmed" : "paid"),
+      status: paymentInfo.method === "cod" ? "confirmed" : "paid",
       total,
       items,
     });
 
     clear();
-    toast.success("Order placed successfully!");
+    toast.success(paymentInfo.method === "cod" ? "Order placed successfully!" : "Payment successful!");
+    navigate({ to: "/order-success", search: { id: paymentInfo.orderId } as never });
+  };
 
-    navigate({
-      to: "/order-success",
-      search: { id: paymentInfo.orderId } as never,
-    });
+  const placeCodOrder = () => {
+    const orderId = "AN" + Math.floor(100000 + Math.random() * 900000);
+    completeOrder({ orderId, method: "cod" });
+  };
+
+  const placeRazorpayOrder = async () => {
+    setPaymentTimeout(false);
+    
+    try {
+      // Load Razorpay script
+      const scriptLoaded = await loadRazorpayScript();
+      if (!scriptLoaded || !window.Razorpay) {
+        throw new Error("Payment gateway failed to load. Please try COD.");
+      }
+
+      // Create order
+      const order = await createOrderFn({
+        data: { amount: total, currency: "INR", receipt: `AN_${Date.now()}` },
+      });
+
+      if (!order?.orderId || !order?.keyId) {
+        throw new Error("Invalid order response");
+      }
+
+      // Get form data for prefill
+      const form = formRef.current;
+      const get = (name: string) =>
+        (form?.elements.namedItem(name) as HTMLInputElement | null)?.value ?? "";
+
+      // Save pending order
+      savePendingOrder({ orderId: order.orderId, method: "razorpay", total, items });
+
+      // Set timeout for payment
+      const timeoutId = setTimeout(() => {
+        setPaymentTimeout(true);
+        setProcessing(false);
+        toast.error("Payment is taking too long. You can retry or use COD.");
+      }, 60000);
+
+      // Initialize Razorpay
+      const rzp = new window.Razorpay({
+        key: order.keyId,
+        amount: order.amount,
+        currency: order.currency,
+        order_id: order.orderId,
+        name: "Ashok Naturals",
+        description: "Pure Indian Spices & Natural Foods",
+        prefill: {
+          name: `${get("firstName")} ${get("lastName")}`.trim(),
+          email: get("email"),
+          contact: get("phone"),
+        },
+        notes: {
+          address: `${get("address1")} ${get("address2") || ""} ${get("city")} ${get("state")} ${get("pincode")}`,
+        },
+        theme: { color: "#1f3d2b" },
+        modal: {
+          ondismiss: () => {
+            clearTimeout(timeoutId);
+            toast.info("Payment cancelled");
+            setProcessing(false);
+          },
+        },
+      });
+
+      rzp.on("payment.failed", (response: any) => {
+        clearTimeout(timeoutId);
+        console.error("Payment failed:", response);
+        toast.error(`Payment failed: ${response.error?.description || "Please try again"}`);
+        setProcessing(false);
+      });
+
+      rzp.open();
+      
+      // Poll for payment status
+      const pollInterval = setInterval(() => {
+        const stored = getStoredOrder(order.orderId);
+        if (stored?.status === "paid") {
+          clearInterval(pollInterval);
+          clearTimeout(timeoutId);
+          completeOrder({ orderId: order.orderId, paymentId: stored.paymentId, method: "razorpay" });
+        }
+      }, 3000);
+
+      setTimeout(() => clearInterval(pollInterval), 120000);
+      
+    } catch (error) {
+      console.error("Razorpay error:", error);
+      toast.error(error instanceof Error ? error.message : "Payment failed. Please use COD.");
+      setProcessing(false);
+    }
   };
 
   const placeOrder = async (e: React.FormEvent) => {
@@ -176,160 +248,27 @@ function Checkout() {
     }
 
     setProcessing(true);
+    setRetryCount(0);
 
     if (method === "cod") {
-      const orderId = "AN" + Math.floor(100000 + Math.random() * 900000);
-      setTimeout(() => {
-        completeOrder({ orderId, method: "cod", status: "confirmed" });
-      }, 500);
-      return;
+      placeCodOrder();
+    } else {
+      await placeRazorpayOrder();
     }
+  };
 
-    try {
-      const ok = await loadRazorpayScript();
-      if (!ok || !window.Razorpay) {
-        throw new Error("Razorpay failed to load");
-      }
-
-      const order = await createOrderFn({
-        data: {
-          amount: total,
-          currency: "INR",
-          receipt: `AN_${Date.now()}`,
-        },
-      });
-
-      if (!order?.orderId || !order?.keyId) {
-        throw new Error("Invalid order response");
-      }
-
-      const form = formRef.current;
-      const get = (name: string) =>
-        (form?.elements.namedItem(name) as HTMLInputElement | null)?.value ??
-        "";
-
-      savePendingOrder({
-        orderId: order.orderId,
-        method: "razorpay",
-        total,
-        items,
-      });
-
-      let completed = false;
-
-      const pollInterval = setInterval(() => {
-        const stored = getStoredOrder(order.orderId);
-        if (stored?.status === "paid" && !completed) {
-          completed = true;
-          clearInterval(pollInterval);
-
-          completeOrder({
-            orderId: order.orderId,
-            paymentId: stored.paymentId,
-            method: "razorpay",
-          });
-        }
-      }, 3000);
-
-      setTimeout(() => {
-        if (!completed) clearInterval(pollInterval);
-      }, 120000);
-
-      const rzp = new window.Razorpay({
-        key: order.keyId,
-        amount: order.amount,
-        currency: order.currency,
-        order_id: order.orderId,
-
-        name: "Ashok Naturals",
-        description: "Pure Indian Spices & Natural Foods",
-
-        prefill: {
-          name: `${get("firstName")} ${get("lastName")}`.trim(),
-          email: get("email"),
-          contact: get("phone"),
-        },
-
-        notes: {
-          address: `${get("address1")} ${get("address2")} ${get(
-            "city"
-          )} ${get("state")} ${get("pincode")}`,
-        },
-
-        theme: { color: "#1f3d2b" },
-
-        retry: {
-          enabled: true,
-          max_count: 2,
-        },
-
-        handler: async (response) => {
-          if (completed) return;
-          completed = true;
-          clearInterval(pollInterval);
-
-          try {
-            await verifyFn({
-              data: {
-                orderId: response.razorpay_order_id,
-                paymentId: response.razorpay_payment_id,
-                signature: response.razorpay_signature,
-              },
-            });
-
-            markStoredOrderPaid(
-              response.razorpay_order_id,
-              response.razorpay_payment_id
-            );
-
-            completeOrder({
-              orderId: response.razorpay_order_id,
-              paymentId: response.razorpay_payment_id,
-              method: "razorpay",
-            });
-          } catch {
-            toast.error("Payment verification failed");
-            setProcessing(false);
-          }
-        },
-
-        modal: {
-          ondismiss: () => {
-            if (!completed) {
-              clearInterval(pollInterval);
-              toast.info("Payment cancelled");
-              setProcessing(false);
-            }
-          },
-        },
-      });
-
-      rzp.on("payment.failed", (resp) => {
-        if (!completed) {
-          clearInterval(pollInterval);
-          markStoredOrderFailed(order.orderId, "Payment failed");
-          toast.error("Payment failed. Please try again.");
-          setProcessing(false);
-        }
-      });
-
-      rzp.open();
-    } catch (err) {
-      toast.error(err instanceof Error ? err.message : "Payment error");
-      setProcessing(false);
-    }
+  const retryPayment = () => {
+    setRetryCount(prev => prev + 1);
+    setPaymentTimeout(false);
+    setProcessing(true);
+    placeRazorpayOrder();
   };
 
   if (items.length === 0) {
     return (
       <section className="container-x py-24 text-center">
-        <h1 className="font-display text-3xl text-primary">
-          Your cart is empty
-        </h1>
-        <button
-          onClick={() => navigate({ to: "/shop" })}
-          className="btn mt-4"
-        >
+        <h1 className="font-display text-3xl text-primary mb-4">Your cart is empty</h1>
+        <button onClick={() => navigate({ to: "/shop" })} className="btn btn-primary">
           Continue Shopping
         </button>
       </section>
@@ -337,251 +276,226 @@ function Checkout() {
   }
 
   return (
-    <section className="container-x py-12">
-      <h1 className="font-display text-4xl text-primary mb-8">Checkout</h1>
+    <section className="container-x py-8 md:py-12">
+      <h1 className="font-display text-3xl md:text-4xl text-primary mb-8">Checkout</h1>
 
       <form ref={formRef} onSubmit={placeOrder} className="grid lg:grid-cols-3 gap-8">
         <div className="lg:col-span-2 space-y-6">
-          {/* Contact */}
-          <div className="bg-card p-6 rounded-2xl border border-border">
-            <h2 className="text-xl font-semibold mb-4 flex items-center gap-2">
-              <span>📞</span> Contact Information
-            </h2>
+          {/* Contact Information */}
+          <div className="bg-white p-6 rounded-2xl shadow-sm border border-gray-100">
+            <h2 className="text-xl font-semibold mb-4">Contact Information</h2>
             <div>
-              <input 
-                name="email" 
+              <input
+                name="email"
                 type="email"
-                required 
-                placeholder="Email address" 
-                className={`input w-full ${formErrors.email ? 'border-red-500' : ''}`}
+                required
+                placeholder="Email address"
+                className={`w-full px-4 py-3 rounded-xl border ${formErrors.email ? 'border-red-500' : 'border-gray-200'} focus:outline-none focus:ring-2 focus:ring-primary`}
               />
-              {formErrors.email && (
-                <p className="text-red-500 text-sm mt-1">{formErrors.email}</p>
-              )}
+              {formErrors.email && <p className="text-red-500 text-sm mt-1">{formErrors.email}</p>}
             </div>
             <div className="mt-3">
-              <input 
-                name="phone" 
+              <input
+                name="phone"
                 type="tel"
-                required 
-                placeholder="Phone number (10 digits)" 
-                className={`input w-full ${formErrors.phone ? 'border-red-500' : ''}`}
+                required
+                placeholder="Phone number (10 digits)"
+                className={`w-full px-4 py-3 rounded-xl border ${formErrors.phone ? 'border-red-500' : 'border-gray-200'} focus:outline-none focus:ring-2 focus:ring-primary`}
               />
-              {formErrors.phone && (
-                <p className="text-red-500 text-sm mt-1">{formErrors.phone}</p>
-              )}
+              {formErrors.phone && <p className="text-red-500 text-sm mt-1">{formErrors.phone}</p>}
             </div>
           </div>
 
-          {/* Shipping */}
-          <div className="bg-card p-6 rounded-2xl border border-border">
-            <h2 className="text-xl font-semibold mb-4 flex items-center gap-2">
-              <span>🚚</span> Shipping Address
-            </h2>
+          {/* Shipping Address */}
+          <div className="bg-white p-6 rounded-2xl shadow-sm border border-gray-100">
+            <h2 className="text-xl font-semibold mb-4">Shipping Address</h2>
             <div className="grid md:grid-cols-2 gap-3">
               <div>
-                <input 
-                  name="firstName" 
-                  required 
-                  placeholder="First name" 
-                  className={`input w-full ${formErrors.firstName ? 'border-red-500' : ''}`}
+                <input
+                  name="firstName"
+                  required
+                  placeholder="First name"
+                  className={`w-full px-4 py-3 rounded-xl border ${formErrors.firstName ? 'border-red-500' : 'border-gray-200'} focus:outline-none focus:ring-2 focus:ring-primary`}
                 />
-                {formErrors.firstName && (
-                  <p className="text-red-500 text-sm mt-1">{formErrors.firstName}</p>
-                )}
+                {formErrors.firstName && <p className="text-red-500 text-sm mt-1">{formErrors.firstName}</p>}
               </div>
               <div>
-                <input 
-                  name="lastName" 
-                  required 
-                  placeholder="Last name" 
-                  className={`input w-full ${formErrors.lastName ? 'border-red-500' : ''}`}
+                <input
+                  name="lastName"
+                  required
+                  placeholder="Last name"
+                  className={`w-full px-4 py-3 rounded-xl border ${formErrors.lastName ? 'border-red-500' : 'border-gray-200'} focus:outline-none focus:ring-2 focus:ring-primary`}
                 />
-                {formErrors.lastName && (
-                  <p className="text-red-500 text-sm mt-1">{formErrors.lastName}</p>
-                )}
+                {formErrors.lastName && <p className="text-red-500 text-sm mt-1">{formErrors.lastName}</p>}
               </div>
             </div>
             <div className="mt-3">
-              <input 
-                name="address1" 
-                required 
-                placeholder="Street address" 
-                className={`input w-full ${formErrors.address ? 'border-red-500' : ''}`}
+              <input
+                name="address1"
+                required
+                placeholder="Street address"
+                className={`w-full px-4 py-3 rounded-xl border ${formErrors.address ? 'border-red-500' : 'border-gray-200'} focus:outline-none focus:ring-2 focus:ring-primary`}
               />
-              {formErrors.address && (
-                <p className="text-red-500 text-sm mt-1">{formErrors.address}</p>
-              )}
+              {formErrors.address && <p className="text-red-500 text-sm mt-1">{formErrors.address}</p>}
             </div>
-            <input name="address2" placeholder="Apartment, suite, etc. (optional)" className="input w-full mt-3" />
+            <input
+              name="address2"
+              placeholder="Apartment, suite, etc. (optional)"
+              className="w-full px-4 py-3 rounded-xl border border-gray-200 focus:outline-none focus:ring-2 focus:ring-primary mt-3"
+            />
             <div className="grid md:grid-cols-3 gap-3 mt-3">
               <div>
-                <input 
-                  name="city" 
-                  required 
-                  placeholder="City" 
-                  className={`input w-full ${formErrors.city ? 'border-red-500' : ''}`}
+                <input
+                  name="city"
+                  required
+                  placeholder="City"
+                  className={`w-full px-4 py-3 rounded-xl border ${formErrors.city ? 'border-red-500' : 'border-gray-200'} focus:outline-none focus:ring-2 focus:ring-primary`}
                 />
-                {formErrors.city && (
-                  <p className="text-red-500 text-sm mt-1">{formErrors.city}</p>
-                )}
+                {formErrors.city && <p className="text-red-500 text-sm mt-1">{formErrors.city}</p>}
               </div>
               <div>
-                <input 
-                  name="state" 
-                  required 
-                  placeholder="State" 
-                  className={`input w-full ${formErrors.state ? 'border-red-500' : ''}`}
+                <input
+                  name="state"
+                  required
+                  placeholder="State"
+                  className={`w-full px-4 py-3 rounded-xl border ${formErrors.state ? 'border-red-500' : 'border-gray-200'} focus:outline-none focus:ring-2 focus:ring-primary`}
                 />
-                {formErrors.state && (
-                  <p className="text-red-500 text-sm mt-1">{formErrors.state}</p>
-                )}
+                {formErrors.state && <p className="text-red-500 text-sm mt-1">{formErrors.state}</p>}
               </div>
               <div>
-                <input 
-                  name="pincode" 
+                <input
+                  name="pincode"
                   type="text"
-                  required 
-                  placeholder="Pincode" 
-                  className={`input w-full ${formErrors.pincode ? 'border-red-500' : ''}`}
+                  required
+                  placeholder="Pincode"
+                  className={`w-full px-4 py-3 rounded-xl border ${formErrors.pincode ? 'border-red-500' : 'border-gray-200'} focus:outline-none focus:ring-2 focus:ring-primary`}
                 />
-                {formErrors.pincode && (
-                  <p className="text-red-500 text-sm mt-1">{formErrors.pincode}</p>
-                )}
+                {formErrors.pincode && <p className="text-red-500 text-sm mt-1">{formErrors.pincode}</p>}
               </div>
             </div>
           </div>
 
-          {/* Payment */}
-          <div className="bg-card p-6 rounded-2xl border border-border">
-            <h2 className="text-xl font-semibold mb-4 flex items-center gap-2">
-              <span>💳</span> Payment Method
-            </h2>
+          {/* Payment Method */}
+          <div className="bg-white p-6 rounded-2xl shadow-sm border border-gray-100">
+            <h2 className="text-xl font-semibold mb-4">Payment Method</h2>
             
-            <div className="space-y-3">
-              {/* Razorpay Option */}
-              <label 
-                className={`flex items-center justify-between p-4 rounded-xl border-2 cursor-pointer transition-all ${
-                  method === "razorpay" 
-                    ? "border-green-500 bg-green-50" 
-                    : "border-border hover:border-gray-300"
-                }`}
-                onClick={() => setMethod("razorpay")}
-              >
-                <div className="flex items-center gap-3">
-                  <input
-                    type="radio"
-                    name="paymentMethod"
-                    checked={method === "razorpay"}
-                    onChange={() => setMethod("razorpay")}
-                    className="w-4 h-4"
-                  />
-                  <div>
-                    <div className="font-semibold flex items-center gap-2">
-                      Pay Online 
-                      <Sparkles className="w-4 h-4 text-green-600" />
-                    </div>
-                    <div className="text-sm text-gray-500">Credit/Debit Card • UPI • NetBanking • Wallet</div>
-                  </div>
-                </div>
-                <div className="flex gap-2">
-                  <img src="https://img.icons8.com/color/24/visa.png" alt="visa" className="w-6 h-6" />
-                  <img src="https://img.icons8.com/color/24/mastercard.png" alt="mastercard" className="w-6 h-6" />
-                  <span className="text-xs text-gray-400">+ More</span>
-                </div>
-              </label>
-
-              {/* COD Option */}
-              <label 
-                className={`flex items-center gap-3 p-4 rounded-xl border-2 cursor-pointer transition-all ${
-                  method === "cod" 
-                    ? "border-green-500 bg-green-50" 
-                    : "border-border hover:border-gray-300"
-                }`}
-                onClick={() => setMethod("cod")}
-              >
-                <input
-                  type="radio"
-                  name="paymentMethod"
-                  checked={method === "cod"}
-                  onChange={() => setMethod("cod")}
-                  className="w-4 h-4"
-                />
+            {/* COD Option - Recommended for reliability */}
+            <button
+              type="button"
+              onClick={() => setMethod("cod")}
+              className={`w-full text-left p-4 rounded-xl border-2 mb-3 transition-all ${
+                method === "cod" ? "border-green-500 bg-green-50" : "border-gray-200 hover:border-gray-300"
+              }`}
+            >
+              <div className="flex items-center justify-between">
                 <div>
-                  <div className="font-semibold">Cash on Delivery</div>
-                  <div className="text-sm text-gray-500">Pay when you receive your order</div>
+                  <div className="font-bold text-lg">💰 Cash on Delivery</div>
+                  <div className="text-sm text-gray-500 mt-1">Pay when you receive your order — No payment issues</div>
                 </div>
-              </label>
+                {method === "cod" && <div className="text-green-500 text-sm font-semibold">✓ Selected</div>}
+              </div>
+            </button>
 
-              {/* Recommended Badge for UPI Options */}
-              <div className="mt-4 p-4 bg-amber-50 rounded-xl border border-amber-200">
-                <div className="flex items-center gap-2 text-amber-800 mb-2">
-                  <span className="text-sm font-semibold">⭐ Recommended</span>
+            {/* Online Payment Option */}
+            <button
+              type="button"
+              onClick={() => setMethod("razorpay")}
+              className={`w-full text-left p-4 rounded-xl border-2 transition-all ${
+                method === "razorpay" ? "border-green-500 bg-green-50" : "border-gray-200 hover:border-gray-300"
+              }`}
+            >
+              <div className="flex items-center justify-between">
+                <div>
+                  <div className="font-bold text-lg">💳 Pay Online</div>
+                  <div className="text-sm text-gray-500 mt-1">Credit/Debit Card • UPI • NetBanking • Wallet</div>
                 </div>
-                <div className="flex gap-3 text-sm text-gray-600">
+                {method === "razorpay" && <div className="text-green-500 text-sm font-semibold">✓ Selected</div>}
+              </div>
+            </button>
+
+            {/* UPI Apps Section */}
+            {method === "razorpay" && (
+              <div className="mt-4 p-4 bg-amber-50 rounded-xl border border-amber-200">
+                <div className="text-sm font-semibold text-amber-800 mb-2">⭐ Recommended UPI Apps</div>
+                <div className="flex gap-4 text-sm">
                   <span>📱 Google Pay</span>
                   <span>📱 PhonePe</span>
                   <span>📱 PayTM</span>
                 </div>
                 <p className="text-xs text-gray-500 mt-2">Quick & secure payments via UPI</p>
               </div>
-            </div>
+            )}
+
+            {/* Payment Timeout Recovery */}
+            {paymentTimeout && method === "razorpay" && (
+              <div className="mt-4 p-4 bg-red-50 rounded-xl border border-red-200">
+                <p className="text-red-800 font-medium mb-2">⚠️ Payment is taking longer than expected</p>
+                <div className="flex gap-3">
+                  <button
+                    type="button"
+                    onClick={retryPayment}
+                    className="px-4 py-2 bg-red-600 text-white rounded-lg text-sm hover:bg-red-700"
+                  >
+                    Retry Payment
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setMethod("cod")}
+                    className="px-4 py-2 bg-gray-600 text-white rounded-lg text-sm hover:bg-gray-700"
+                  >
+                    Switch to COD
+                  </button>
+                </div>
+              </div>
+            )}
           </div>
 
           {/* Security Notice */}
           <div className="bg-green-50 p-4 rounded-xl flex items-center gap-3 text-sm text-green-800">
-            <Lock className="w-5 h-5" />
+            <span className="text-xl">🔒</span>
             <span>Your payment information is processed securely. We do not store your card details.</span>
           </div>
         </div>
 
-        {/* Summary */}
-        <aside className="bg-card p-6 rounded-2xl border border-border h-fit sticky top-4">
-          <h2 className="text-xl font-semibold mb-4">Order Summary</h2>
-          
-          <div className="space-y-2 text-sm">
-            <div className="flex justify-between">
-              <span className="text-gray-600">Subtotal ({items.length} items)</span>
-              <span>{inr(subtotal)}</span>
-            </div>
-            <div className="flex justify-between">
-              <span className="text-gray-600">Shipping</span>
-              <span>{shipping === 0 ? 'FREE' : inr(shipping)}</span>
-            </div>
-            <div className="flex justify-between">
-              <span className="text-gray-600">GST (5%)</span>
-              <span>{inr(gst)}</span>
-            </div>
-            <div className="border-t pt-2 mt-2">
-              <div className="flex justify-between font-bold text-lg">
-                <span>Total</span>
-                <span>{inr(total)}</span>
+        {/* Order Summary */}
+        <div className="lg:col-span-1">
+          <div className="bg-white p-6 rounded-2xl shadow-sm border border-gray-100 sticky top-4">
+            <h2 className="text-xl font-semibold mb-4">Order Summary</h2>
+            
+            <div className="space-y-3 text-sm">
+              <div className="flex justify-between">
+                <span className="text-gray-600">Subtotal ({items.length} {items.length === 1 ? 'item' : 'items'})</span>
+                <span className="font-medium">{inr(subtotal)}</span>
               </div>
-              {shipping === 0 && (
-                <p className="text-green-600 text-xs mt-1">✨ Free shipping applied!</p>
+              <div className="flex justify-between">
+                <span className="text-gray-600">Shipping</span>
+                <span className="font-medium">{shipping === 0 ? 'FREE' : inr(shipping)}</span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-gray-600">GST (5%)</span>
+                <span className="font-medium">{inr(gst)}</span>
+              </div>
+              
+              {shipping === 0 && subtotal > 599 && (
+                <div className="text-green-600 text-xs py-1">✨ Free shipping applied!</div>
               )}
+              
+              <div className="border-t pt-3 mt-3">
+                <div className="flex justify-between font-bold text-lg">
+                  <span>Total</span>
+                  <span className="text-primary">{inr(total)}</span>
+                </div>
+              </div>
             </div>
-          </div>
 
-          <button 
-            type="submit" 
-            disabled={processing} 
-            className="btn w-full mt-6 bg-primary text-white py-3 rounded-xl font-semibold hover:bg-primary/90 transition disabled:opacity-50"
-          >
-            {processing ? (
-              <span className="flex items-center justify-center gap-2">
-                <span className="animate-spin">⏳</span> Processing...
-              </span>
-            ) : (
-              `Place Order • ${inr(total)}`
-            )}
-          </button>
-
-          <p className="text-center text-xs text-gray-500 mt-4">
-            By placing your order, you agree to our Terms of Service and Privacy Policy
-          </p>
-        </aside>
-      </form>
-    </section>
-  );
-  }
+            <button
+              type="submit"
+              disabled={processing}
+              className="w-full mt-6 bg-primary text-white py-3 rounded-xl font-semibold hover:bg-primary/90 transition disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              {processing ? (
+                <span className="flex items-center justify-center gap-2">
+                  <svg className="animate-spin h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.9
+                    
