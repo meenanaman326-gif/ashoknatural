@@ -503,86 +503,132 @@ function Checkout() {
           </p>
         </aside>
       </form>
+{/* UPI Payment Modal */}
+{showQRPayment && (
+  <div
+    className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 p-4"
+    onClick={() => setShowQRPayment(false)}
+  >
+    <div
+      className="bg-white rounded-3xl max-w-md w-full overflow-hidden shadow-2xl"
+      onClick={(e) => e.stopPropagation()}
+    >
+      {/* Header */}
+      <div className="bg-gradient-to-r from-green-600 to-emerald-500 px-6 py-5 text-white text-center">
+        <h3 className="text-2xl font-bold">Pay with UPI</h3>
+        <p className="text-sm opacity-90 mt-1">
+          Scan & pay using any UPI app
+        </p>
+      </div>
 
-      {/* UPI Payment Modal - WORKING VERSION (NO QR CODE ISSUES) */}
-      {showQRPayment && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4" onClick={() => setShowQRPayment(false)}>
-          <div className="bg-white rounded-2xl max-w-md w-full p-6" onClick={(e) => e.stopPropagation()}>
-            <div className="text-center">
-              <h3 className="text-xl font-bold mb-2">Pay with UPI</h3>
-              <p className="text-gray-500 text-sm mb-4">Choose your preferred UPI app</p>
-              
-              {/* UPI App Buttons */}
-              <div className="space-y-3 mb-6">
-                <button
-                  type="button"
-                  onClick={() => openUPIApp("gpay")}
-                  className="w-full flex items-center gap-4 p-4 rounded-xl border-2 border-gray-200 hover:border-green-500 hover:bg-green-50 transition-all"
-                >
-                  <span className="text-3xl">📱</span>
-                  <div className="flex-1 text-left">
-                    <p className="font-semibold">Google Pay</p>
-                    <p className="text-xs text-gray-500">Pay instantly with Google Pay</p>
-                  </div>
-                  <span className="text-green-600">→</span>
-                </button>
-                
-                <button
-                  type="button"
-                  onClick={() => openUPIApp("phonepe")}
-                  className="w-full flex items-center gap-4 p-4 rounded-xl border-2 border-gray-200 hover:border-purple-500 hover:bg-purple-50 transition-all"
-                >
-                  <span className="text-3xl">📱</span>
-                  <div className="flex-1 text-left">
-                    <p className="font-semibold">PayTM</p>
-                    <p className="text-xs text-gray-500">Pay instantly with PayTM</p>
-                  </div>
-                  <span className="text-blue-600">→</span>
-                </button>
-              </div>
-              
-              {/* Manual Payment Option */}
-              <div className="bg-gray-50 p-4 rounded-lg mb-4">
-                <p className="text-sm font-medium text-gray-700 mb-2">Or pay manually:</p>
-                <div className="flex items-center justify-between gap-2">
-                  <p className="text-sm font-mono font-bold text-green-700 break-all">ashoknaturals@okhdfcbank</p>
-                  <button
-                    type="button"
-                    onClick={copyUPIID}
-                    className="px-3 py-1.5 bg-green-600 text-white rounded-lg text-sm hover:bg-green-700 transition-colors whitespace-nowrap"
-                  >
-                    {copied ? "✓ Copied!" : "Copy UPI ID"}
-                  </button>
-                </div>
-                <p className="text-sm font-bold mt-3">Amount to pay: <span className="text-green-700">{inr(total)}</span></p>
-                <p className="text-xs text-gray-500 mt-2">After payment, click "I've Made the Payment" below</p>
-              </div>
-              
-              {/* Action Buttons */}
-              <div className="flex gap-2">
-                <button
-                  type="button"
-                  onClick={() => setShowQRPayment(false)}
-                  className="flex-1 px-4 py-2 rounded-lg border border-gray-300 hover:bg-gray-50 transition-colors"
-                >
-                  Cancel
-                </button>
-                <button
-                  type="button"
-                  onClick={confirmUPIPayment}
-                  className="flex-1 px-4 py-2 rounded-lg bg-green-600 text-white hover:bg-green-700 transition-colors"
-                >
-                  I've Made the Payment
-                </button>
-              </div>
-              
-              <p className="text-xs text-gray-500 mt-4">
-                Your order will be confirmed after payment verification
-              </p>
-            </div>
+      <div className="p-6">
+        {/* QR IMAGE */}
+        <div className="bg-gray-50 rounded-2xl p-4 border text-center">
+          <img
+            src="/images/payment-qr.png"
+            alt="UPI QR Code"
+            className="w-full max-w-xs mx-auto rounded-xl shadow-md"
+          />
+
+          <div className="mt-4">
+            <p className="text-lg font-bold text-green-700">
+              Amount: {inr(total)}
+            </p>
+
+            <p className="text-sm text-gray-500 mt-1">
+              Scan this QR using Google Pay, PhonePe, Paytm or any UPI app
+            </p>
           </div>
         </div>
-      )}
-    </section>
-  );
-}
+
+        {/* UPI ID */}
+        <div className="mt-5 bg-green-50 border border-green-200 rounded-xl p-4">
+          <p className="text-sm text-gray-600 mb-2 font-medium">
+            Manual UPI ID
+          </p>
+
+          <div className="flex items-center gap-2">
+            <div className="flex-1 bg-white border rounded-lg px-3 py-2 text-sm font-semibold text-green-700 break-all">
+              ashoknaturals@okhdfcbank
+            </div>
+
+            <button
+              type="button"
+              onClick={copyUPIID}
+              className="px-4 py-2 bg-green-600 hover:bg-green-700 text-white rounded-lg text-sm font-medium transition-colors"
+            >
+              {copied ? "Copied!" : "Copy"}
+            </button>
+          </div>
+        </div>
+
+        {/* Supported Apps */}
+        <div className="mt-5">
+          <p className="text-sm font-semibold text-gray-700 mb-3">
+            Open directly in:
+          </p>
+
+          <div className="grid grid-cols-3 gap-3">
+            {/* Google Pay */}
+            <button
+              type="button"
+              onClick={() => openUPIApp("gpay")}
+              className="border rounded-xl p-3 hover:border-green-500 hover:bg-green-50 transition-all"
+            >
+              <div className="text-3xl mb-1">💳</div>
+              <p className="text-xs font-medium">GPay</p>
+            </button>
+
+            {/* PhonePe */}
+            <button
+              type="button"
+              onClick={() => openUPIApp("phonepe")}
+              className="border rounded-xl p-3 hover:border-purple-500 hover:bg-purple-50 transition-all"
+            >
+              <div className="text-3xl mb-1">📱</div>
+              <p className="text-xs font-medium">PhonePe</p>
+            </button>
+
+            {/* Paytm */}
+            <button
+              type="button"
+              onClick={() => openUPIApp("paytm")}
+              className="border rounded-xl p-3 hover:border-blue-500 hover:bg-blue-50 transition-all"
+            >
+              <div className="text-3xl mb-1">💰</div>
+              <p className="text-xs font-medium">Paytm</p>
+            </button>
+          </div>
+        </div>
+
+        {/* Info */}
+        <div className="mt-5 bg-yellow-50 border border-yellow-200 rounded-xl p-3">
+          <p className="text-xs text-yellow-800 leading-relaxed">
+            After completing payment, click the button below.
+            Your order will be confirmed after payment verification.
+          </p>
+        </div>
+
+        {/* Action Buttons */}
+        <div className="flex gap-3 mt-6">
+          <button
+            type="button"
+            onClick={() => setShowQRPayment(false)}
+            className="flex-1 py-3 rounded-xl border border-gray-300 hover:bg-gray-50 transition-colors font-medium"
+          >
+            Cancel
+          </button>
+
+          <button
+            type="button"
+            onClick={confirmUPIPayment}
+            className="flex-1 py-3 rounded-xl bg-green-600 hover:bg-green-700 text-white font-semibold transition-colors"
+          >
+            I've Paid
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+)}
+     
