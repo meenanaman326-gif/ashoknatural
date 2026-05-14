@@ -159,7 +159,101 @@ function Checkout() {
   amount: order.amount,
   currency: order.currency,
   order_id: order.orderId,
+
   name: "Ashok Naturals",
+  description: "Pure Indian Spices & Natural Foods",
+
+  prefill: {
+    name: `${get("firstName")} ${get("lastName")}`.trim(),
+    email: get("email"),
+    contact: get("phone"),
+  },
+
+  notes: {
+    address: `${get("address1")} ${get("address2")} ${get("city")} ${get("state")} ${get("pincode")}`,
+  },
+
+  redirect: false,
+
+  theme: { color: "#1f3d2b" },
+
+  retry: {
+    enabled: true,
+    max_count: 2,
+  },
+
+  send_sms_hash: true,
+  remember_customer: false,
+
+  method: {
+    upi: true,
+    card: true,
+    netbanking: true,
+    wallet: true,
+  },
+
+  config: {
+    display: {
+      blocks: {
+        upi: {
+          name: "Pay using UPI",
+          instruments: [{ method: "upi" }],
+        },
+      },
+      sequence: ["block.upi"],
+      preferences: {
+        show_default_blocks: true,
+      },
+    },
+  },
+
+  handler: async (response) => {
+    clearInterval(pollInterval);
+
+    try {
+      await verifyFn({
+        data: {
+          orderId: response.razorpay_order_id,
+          paymentId: response.razorpay_payment_id,
+          signature: response.razorpay_signature,
+        },
+      });
+
+      markStoredOrderPaid(
+        response.razorpay_order_id,
+        response.razorpay_payment_id
+      );
+
+      completeOrder({
+        orderId: response.razorpay_order_id,
+        paymentId: response.razorpay_payment_id,
+        method: "razorpay",
+      });
+    } catch (err) {
+      console.error(err);
+      toast.error("Payment verification failed. Please contact support.");
+      setProcessing(false);
+    }
+  },
+
+  modal: {
+    ondismiss: () => {
+      clearInterval(pollInterval);
+      toast.info("Payment cancelled");
+      setProcessing(false);
+    },
+  },
+});
+
+rzp.on("payment.failed", (resp: unknown) => {
+  clearInterval(pollInterval);
+  console.error("Razorpay payment failed:", resp);
+  markStoredOrderFailed(order.orderId, "Payment failed");
+  toast.error("Payment failed. Please try again.");
+  setProcessing(false);
+});
+
+rzp.open();
   description: "Pure Indian Spices & Natural Foods",
 
   prefill: {
@@ -230,82 +324,7 @@ function Checkout() {
       });
 
       markStoredOrderPaid(
-        response.razorpay_order_id,
-        response.razorpay_payment_id
-      );
 
-      completeOrder({
-        orderId: response.razorpay_order_id,
-        paymentId: response.razorpay_payment_id,
-        method: "razorpay",
-      });
-
-    } catch (err) {
-      console.error(err);
-      toast.error("Payment verification failed. Please contact support.");
-      setProcessing(false);
-    }
-  },
-
-  modal: {
-    ondismiss: () => {
-      clearInterval(pollInterval);
-      toast.info("Payment cancelled");
-      setProcessing(false);
-    },
-  },
-});
-      
-    sequence: ["block.upi"],
-    preferences: {
-      show_default_blocks: true,
-    },
-  },
-},
-        handler: async (response: {
-          razorpay_order_id: string;
-          razorpay_payment_id: string;
-          razorpay_signature: string;
-        }) => {
-          clearInterval(pollInterval);
-          try {
-            await verifyFn({
-              data: {
-                orderId: response.razorpay_order_id,
-                paymentId: response.razorpay_payment_id,
-                signature: response.razorpay_signature,
-              },
-            });
-            markStoredOrderPaid(response.razorpay_order_id, response.razorpay_payment_id);
-            completeOrder({
-              orderId: response.razorpay_order_id,
-              paymentId: response.razorpay_payment_id,
-              method: "razorpay",
-            });
-          } catch (err) {
-            console.error(err);
-            toast.error("Payment verification failed. Please contact support.");
-            setProcessing(false);
-          }
-        },
-        modal: {
-          ondismiss: () => {
-            clearInterval(pollInterval);
-            toast.info("Payment cancelled");
-            setProcessing(false);
-          },
-        },
-      });
-
-      rzp.on("payment.failed", (resp: unknown) => {
-        clearInterval(pollInterval);
-        console.error("Razorpay payment failed:", resp);
-        markStoredOrderFailed(order.orderId, "Payment failed");
-        toast.error("Payment failed. Please try again.");
-        setProcessing(false);
-      });
-
-      rzp.open();
     } catch (err) {
       console.error(err);
       toast.error(err instanceof Error ? err.message : "Could not start payment");
