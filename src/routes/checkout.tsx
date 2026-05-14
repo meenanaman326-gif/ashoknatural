@@ -170,16 +170,35 @@ function Checkout() {
           address: `${get("address1")} ${get("address2")} ${get("city")} ${get("state")} ${get("pincode")}`,
         },
         callback_url: callbackUrl,
-        redirect: true, // Always redirect — fixes UPI/Paytm/GPay stuck issue
-        theme: { color: "#1f3d2b" },
-        retry: { enabled: true, max_count: 2 },
-        send_sms_hash: true,
-        remember_customer: false,
-        config: {
-          display: {
-            preferences: { show_default_blocks: true },
+redirect: false,
+theme: { color: "#1f3d2b" },
+retry: { enabled: true, max_count: 2 },
+send_sms_hash: true,
+remember_customer: false,
+method: {
+  upi: true,
+  card: true,
+  netbanking: true,
+  wallet: true,
+},
+config: {
+  display: {
+    blocks: {
+      upi: {
+        name: "Pay using UPI",
+        instruments: [
+          {
+            method: "upi",
           },
-        },
+        ],
+      },
+    },
+    sequence: ["block.upi"],
+    preferences: {
+      show_default_blocks: true,
+    },
+  },
+},
         handler: async (response: {
           razorpay_order_id: string;
           razorpay_payment_id: string;
