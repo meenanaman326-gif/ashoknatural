@@ -119,12 +119,12 @@ function Checkout() {
     navigate({ to: "/order-success", search: { id: paymentInfo.orderId } as never });
   };
 
-  // QR Code Payment Handler
-  const handleQRPayment = () => {
+  // UPI Payment Handler
+  const handleUPIPayment = () => {
     setShowQRPayment(true);
   };
 
-  const confirmQRPayment = () => {
+  const confirmUPIPayment = () => {
     const orderId = "AN" + Math.floor(100000 + Math.random() * 900000);
     setShowQRPayment(false);
     
@@ -136,20 +136,47 @@ function Checkout() {
       total: total,
       items: items,
       status: "pending",
-      method: "upi_qr",
+      method: "upi",
     });
     localStorage.setItem("orders", JSON.stringify(orders));
     
     clear();
-    toast.success("Payment confirmation received! Order placed.");
+    toast.success("Payment initiated! Order placed. We'll confirm after receiving payment.");
     navigate({ to: "/order-success", search: { id: orderId } as never });
   };
 
   const copyUPIID = () => {
     navigator.clipboard.writeText("ashoknaturals@okhdfcbank");
     setCopied(true);
-    toast.success("UPI ID copied!");
-    setTimeout(() => setCopied(false), 2000);
+    toast.success("UPI ID copied! Open your UPI app and send the amount.");
+    setTimeout(() => setCopied(false), 3000);
+  };
+
+  const openUPIApp = (app: string) => {
+    const upiLink = `upi://pay?pa=ashoknaturals@okhdfcbank&pn=Ashok%20Naturals&am=${total}&cu=INR`;
+    
+    let appLink = "";
+    switch(app) {
+      case "gpay":
+        appLink = `tez://upi/pay?pa=ashoknaturals@okhdfcbank&pn=Ashok%20Naturals&am=${total}&cu=INR`;
+        break;
+      case "phonepe":
+        appLink = `phonepe://pay?pa=ashoknaturals@okhdfcbank&pn=Ashok%20Naturals&am=${total}`;
+        break;
+      case "paytm":
+        appLink = `paytmmp://upi/pay?pa=ashoknaturals@okhdfcbank&pn=Ashok%20Naturals&am=${total}`;
+        break;
+      default:
+        appLink = upiLink;
+    }
+    
+    window.location.href = appLink;
+    
+    // Fallback: if app doesn't open, copy UPI ID
+    setTimeout(() => {
+      copyUPIID();
+      toast.info("If app didn't open, UPI ID has been copied");
+    }, 1000);
   };
 
   const placeOrder = async (e: React.FormEvent) => {
@@ -159,6 +186,7 @@ function Checkout() {
     if (method === "cod") {
       const orderId = "AN" + Math.floor(100000 + Math.random() * 900000);
       completeOrder({ orderId, method: "cod", status: "confirmed" });
+      setProcessing(false);
       return;
     }
 
@@ -361,15 +389,15 @@ function Checkout() {
           <div className="bg-card rounded-2xl p-6 shadow-card">
             <h2 className="font-display text-xl text-primary mb-4">Payment method</h2>
             <div className="space-y-2">
-              {/* QR Code Payment Option */}
+              {/* UPI Payment Option */}
               <button
                 type="button"
-                onClick={handleQRPayment}
+                onClick={handleUPIPayment}
                 className="w-full flex items-start gap-3 p-4 rounded-xl border-2 border-green-500 bg-green-50 cursor-pointer transition-all hover:shadow-md"
               >
                 <QrCode className="w-5 h-5 text-green-600 mt-0.5" />
                 <div className="flex-1 text-left">
-                  <p className="font-semibold text-green-800">📱 Pay via UPI QR Code</p>
+                  <p className="font-semibold text-green-800">📱 Pay with UPI</p>
                   <p className="text-xs text-gray-600">Google Pay • PhonePe • PayTM • BHIM • Any UPI App</p>
                 </div>
                 <div className="text-2xl">📱</div>
@@ -476,51 +504,72 @@ function Checkout() {
         </aside>
       </form>
 
-      {/* QR Code Payment Modal - FIXED VERSION */}
+      {/* UPI Payment Modal - WORKING VERSION (NO QR CODE ISSUES) */}
       {showQRPayment && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4" onClick={() => setShowQRPayment(false)}>
           <div className="bg-white rounded-2xl max-w-md w-full p-6" onClick={(e) => e.stopPropagation()}>
             <div className="text-center">
-              <h3 className="text-xl font-bold mb-2">Pay with UPI QR Code</h3>
-              <p className="text-gray-500 text-sm mb-4">Scan & pay using any UPI app</p>
+              <h3 className="text-xl font-bold mb-2">Pay with UPI</h3>
+              <p className="text-gray-500 text-sm mb-4">Choose your preferred UPI app</p>
               
-              {/* QR Code Image */}
-              <div className="bg-gradient-to-r from-green-50 to-green-100 p-4 rounded-xl mb-4">
-                <div className="bg-white p-4 rounded-xl inline-block">
-                  <img 
-                    src={`https://quickchart.io/qr?text=upi://pay?pa=ashoknaturals@okhdfcbank&pn=Ashok%20Naturals&am=${total}&cu=INR&size=300&margin=2&ecLevel=H`}
-                    alt="UPI QR Code"
-                    className="w-48 h-48 mx-auto"
-                    onError={(e) => {
-                      // Fallback if QR generation fails
-                      e.currentTarget.src = `https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=${encodeURIComponent(`upi://pay?pa=ashoknaturals@okhdfcbank&pn=Ashok%20Naturals&am=${total}&cu=INR`)}`;
-                    }}
-                  />
-                </div>
-                <p className="text-xs text-gray-600 mt-3">Scan with any UPI app to pay</p>
-                <p className="text-sm font-bold text-green-700 mt-2">Amount: {inr(total)}</p>
+              {/* UPI App Buttons */}
+              <div className="space-y-3 mb-6">
+                <button
+                  type="button"
+                  onClick={() => openUPIApp("gpay")}
+                  className="w-full flex items-center gap-4 p-4 rounded-xl border-2 border-gray-200 hover:border-green-500 hover:bg-green-50 transition-all"
+                >
+                  <span className="text-3xl">📱</span>
+                  <div className="flex-1 text-left">
+                    <p className="font-semibold">Google Pay</p>
+                    <p className="text-xs text-gray-500">Pay instantly with Google Pay</p>
+                  </div>
+                  <span className="text-green-600">→</span>
+                </button>
+                
+                <button
+                  type="button"
+                  onClick={() => openUPIApp("phonepe")}
+                  className="w-full flex items-center gap-4 p-4 rounded-xl border-2 border-gray-200 hover:border-purple-500 hover:bg-purple-50 transition-all"
+                >
+                  <span className="text-3xl">📱</span>
+                  <div className="flex-1 text-left">
+                    <p className="font-semibold">PayTM</p>
+                    <p className="text-xs text-gray-500">Pay instantly with PayTM</p>
+                  </div>
+                  <span className="text-blue-600">→</span>
+                </button>
               </div>
               
-              {/* UPI ID for manual payment */}
-              <div className="bg-gray-50 p-3 rounded-lg mb-4">
-                <p className="text-sm font-medium text-gray-700">Or pay manually to this UPI ID:</p>
-                <div className="flex items-center justify-between gap-2 mt-2">
-                  <p className="text-base font-mono font-bold text-green-700">ashoknaturals@okhdfcbank</p>
+              {/* Manual Payment Option */}
+              <div className="bg-gray-50 p-4 rounded-lg mb-4">
+                <p className="text-sm font-medium text-gray-700 mb-2">Or pay manually:</p>
+                <div className="flex items-center justify-between gap-2">
+                  <p className="text-sm font-mono font-bold text-green-700 break-all">ashoknaturals@okhdfcbank</p>
                   <button
                     type="button"
                     onClick={copyUPIID}
-                    className="px-3 py-1 bg-green-600 text-white rounded-lg text-sm hover:bg-green-700 transition-colors"
+                    className="px-3 py-1.5 bg-green-600 text-white rounded-lg text-sm hover:bg-green-700 transition-colors whitespace-nowrap"
                   >
-                    {copied ? "Copied!" : "Copy"}
+                    {copied ? "✓ Copied!" : "Copy UPI ID"}
                   </button>
                 </div>
+                <p className="text-sm font-bold mt-3">Amount to pay: <span className="text-green-700">{inr(total)}</span></p>
+                <p className="text-xs text-gray-500 mt-2">After payment, click "I've Made the Payment" below</p>
               </div>
               
-              {/* Action buttons */}
+              {/* Action Buttons */}
               <div className="flex gap-2">
                 <button
                   type="button"
-                  onClick={confirmQRPayment}
+                  onClick={() => setShowQRPayment(false)}
+                  className="flex-1 px-4 py-2 rounded-lg border border-gray-300 hover:bg-gray-50 transition-colors"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="button"
+                  onClick={confirmUPIPayment}
                   className="flex-1 px-4 py-2 rounded-lg bg-green-600 text-white hover:bg-green-700 transition-colors"
                 >
                   I've Made the Payment
