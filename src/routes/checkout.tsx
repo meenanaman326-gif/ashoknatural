@@ -14,6 +14,9 @@ import {
   getStoredOrder,
 } from "@/lib/order-storage";
 
+// Remove lucide-react import if you don't have it
+// import { CreditCard, Wallet, Truck, Lock, CheckCircle2, Sparkles } from "lucide-react";
+
 declare global {
   interface Window {
     Razorpay?: new (opts: Record<string, unknown>) => {
@@ -51,7 +54,6 @@ function Checkout() {
   const [processing, setProcessing] = useState(false);
   const [paymentTimeout, setPaymentTimeout] = useState(false);
   const [formErrors, setFormErrors] = useState<Record<string, string>>({});
-  const [retryCount, setRetryCount] = useState(0);
 
   const formRef = useRef<HTMLFormElement>(null);
 
@@ -155,13 +157,11 @@ function Checkout() {
     setPaymentTimeout(false);
     
     try {
-      // Load Razorpay script
       const scriptLoaded = await loadRazorpayScript();
       if (!scriptLoaded || !window.Razorpay) {
         throw new Error("Payment gateway failed to load. Please try COD.");
       }
 
-      // Create order
       const order = await createOrderFn({
         data: { amount: total, currency: "INR", receipt: `AN_${Date.now()}` },
       });
@@ -170,22 +170,18 @@ function Checkout() {
         throw new Error("Invalid order response");
       }
 
-      // Get form data for prefill
       const form = formRef.current;
       const get = (name: string) =>
         (form?.elements.namedItem(name) as HTMLInputElement | null)?.value ?? "";
 
-      // Save pending order
       savePendingOrder({ orderId: order.orderId, method: "razorpay", total, items });
 
-      // Set timeout for payment
       const timeoutId = setTimeout(() => {
         setPaymentTimeout(true);
         setProcessing(false);
         toast.error("Payment is taking too long. You can retry or use COD.");
       }, 60000);
 
-      // Initialize Razorpay
       const rzp = new window.Razorpay({
         key: order.keyId,
         amount: order.amount,
@@ -220,7 +216,6 @@ function Checkout() {
 
       rzp.open();
       
-      // Poll for payment status
       const pollInterval = setInterval(() => {
         const stored = getStoredOrder(order.orderId);
         if (stored?.status === "paid") {
@@ -248,7 +243,6 @@ function Checkout() {
     }
 
     setProcessing(true);
-    setRetryCount(0);
 
     if (method === "cod") {
       placeCodOrder();
@@ -258,7 +252,6 @@ function Checkout() {
   };
 
   const retryPayment = () => {
-    setRetryCount(prev => prev + 1);
     setPaymentTimeout(false);
     setProcessing(true);
     placeRazorpayOrder();
@@ -268,7 +261,10 @@ function Checkout() {
     return (
       <section className="container-x py-24 text-center">
         <h1 className="font-display text-3xl text-primary mb-4">Your cart is empty</h1>
-        <button onClick={() => navigate({ to: "/shop" })} className="btn btn-primary">
+        <button 
+          onClick={() => navigate({ to: "/shop" })} 
+          className="bg-primary text-white px-6 py-3 rounded-xl font-semibold"
+        >
           Continue Shopping
         </button>
       </section>
@@ -379,7 +375,6 @@ function Checkout() {
           <div className="bg-white p-6 rounded-2xl shadow-sm border border-gray-100">
             <h2 className="text-xl font-semibold mb-4">Payment Method</h2>
             
-            {/* COD Option - Recommended for reliability */}
             <button
               type="button"
               onClick={() => setMethod("cod")}
@@ -396,7 +391,6 @@ function Checkout() {
               </div>
             </button>
 
-            {/* Online Payment Option */}
             <button
               type="button"
               onClick={() => setMethod("razorpay")}
@@ -413,7 +407,6 @@ function Checkout() {
               </div>
             </button>
 
-            {/* UPI Apps Section */}
             {method === "razorpay" && (
               <div className="mt-4 p-4 bg-amber-50 rounded-xl border border-amber-200">
                 <div className="text-sm font-semibold text-amber-800 mb-2">⭐ Recommended UPI Apps</div>
@@ -426,7 +419,6 @@ function Checkout() {
               </div>
             )}
 
-            {/* Payment Timeout Recovery */}
             {paymentTimeout && method === "razorpay" && (
               <div className="mt-4 p-4 bg-red-50 rounded-xl border border-red-200">
                 <p className="text-red-800 font-medium mb-2">⚠️ Payment is taking longer than expected</p>
@@ -495,7 +487,20 @@ function Checkout() {
             >
               {processing ? (
                 <span className="flex items-center justify-center gap-2">
-                  <svg className="animate-spin h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.9
-                    
+                  <span className="inline-block h-5 w-5 animate-spin rounded-full border-2 border-white border-t-transparent"></span>
+                  Processing...
+                </span>
+              ) : (
+                `Place Order • ${inr(total)}`
+              )}
+            </button>
+
+            <p className="text-center text-xs text-gray-500 mt-4">
+              By placing your order, you agree to our Terms of Service
+            </p>
+          </div>
+        </div>
+      </form>
+    </section>
+  );
+                  }
