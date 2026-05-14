@@ -522,25 +522,25 @@ function Checkout() {
       </div>
 
       <div className="p-6">
-        {/* QR IMAGE */}
-        <div className="bg-gray-50 rounded-2xl p-4 border text-center">
-          <img
-            src="/images/payment-qr.png"
-            alt="UPI QR Code"
-            className="w-full max-w-xs mx-auto rounded-xl shadow-md"
-          />
+        
+        {/* QR IMAGE SECTION */}
+<div className="bg-gray-50 rounded-2xl p-4 border text-center">
+  <img
+    src="/images/payment-qr.png"
+    alt="UPI QR Code"
+    className="w-full max-w-xs mx-auto rounded-xl shadow-md"
+  />
 
-          <div className="mt-4">
-            <p className="text-lg font-bold text-green-700">
-              Amount: {inr(total)}
-            </p>
+  <div className="mt-4">
+    <p className="text-lg font-bold text-green-700">
+      Amount: {inr(total)}
+    </p>
 
-            <p className="text-sm text-gray-500 mt-1">
-              Scan this QR using Google Pay, PhonePe, Paytm or any UPI app
-            </p>
-          </div>
-        </div>
-
+    <p className="text-sm text-gray-500 mt-1">
+      Scan this QR using Google Pay, PhonePe, Paytm or any UPI app
+    </p>
+  </div>
+</div>
         {/* UPI ID */}
         <div className="mt-5 bg-green-50 border border-green-200 rounded-xl p-4">
           <p className="text-sm text-gray-600 mb-2 font-medium">
