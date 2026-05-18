@@ -1,10 +1,20 @@
-
 import { createServerFn } from "@tanstack/react-start";
 import { createHmac } from "crypto";
 
-/* =========================
-   HELPERS
-========================= */
+/* ---------------- SECURITY ---------------- */
+
+function validateOrigin(request: Request) {
+  const origin = request.headers.get("origin");
+
+  const allowedOrigins = [
+    "https://ashoknatural.lovable.app",
+    "http://localhost:3000",
+  ];
+
+  if (!origin || !allowedOrigins.includes(origin)) {
+    throw new Error("Unauthorized request");
+  }
+}
 
 function verifySignature(
   orderId: string,
@@ -20,8 +30,8 @@ function verifySignature(
 }
 
 function getRazorpayAuth() {
-  const keyId = process.env["RAZORPAY_KEY_ID"];
-  const keySecret = process.env["RAZORPAY_KEY_SECRET"];
+  const keyId = process.env.RAZORPAY_KEY_ID;
+  const keySecret = process.env.RAZORPAY_KEY_SECRET;
 
   if (!keyId || !keySecret) {
     throw new Error("Razorpay keys not configured");
@@ -36,14 +46,11 @@ function getRazorpayAuth() {
   };
 }
 
-/* =========================
-   CREATE ORDER
-========================= */
+/* ---------------- CREATE ORDER ---------------- */
 
 export const createRazorpayOrder = createServerFn({
   method: "POST",
 })
-
   .inputValidator(
     (data: {
       items: {
@@ -64,20 +71,27 @@ export const createRazorpayOrder = createServerFn({
       };
     }
   )
-
-  .handler(async ({ data }) => {
-    // Server-side total calculation
-    const subtotal = data.items.reduce(
-      (sum, item) => sum + item.price * item.qty,
-      0
-    );
-
-    const shipping = subtotal > 599 ? 0 : 49;
-    const gst = Math.round(subtotal * 0.05);
-
-    const finalAmount = subtotal + shipping + gst;
+  .handler(async ({ data, request }) => {
+    validateOrigin(request);
 
     const { keyId, authorization } = getRazorpayAuth();
+
+    /* ---------- SERVER-SIDE TOTAL ---------- */
+
+    const total = data.items.reduce((sum, item) => {
+      return sum + item.price * item.qty;
+    }, 0);
+
+    const shipping = total > 599 ? 0 : 49;
+    const gst = Math.round(total * 0.05);
+
+    const finalAmount = total + shipping + gst;
+
+    if (finalAmount <= 0) {
+      throw new Error("Invalid order amount");
+    }
+
+    /* ---------- CREATE ORDER ---------- */
 
     const res = await fetch("https://api.razorpay.com/v1/orders", {
       method: "POST",
@@ -115,14 +129,11 @@ export const createRazorpayOrder = createServerFn({
     };
   });
 
-/* =========================
-   VERIFY PAYMENT
-========================= */
+/* ---------------- VERIFY PAYMENT ---------------- */
 
 export const verifyRazorpayPayment = createServerFn({
   method: "POST",
 })
-
   .inputValidator(
     (d: {
       orderId: string;
@@ -136,9 +147,10 @@ export const verifyRazorpayPayment = createServerFn({
       return d;
     }
   )
+  .handler(async ({ data, request }) => {
+    validateOrigin(request);
 
-  .handler(async ({ data }) => {
-    const secret = process.env["RAZORPAY_KEY_SECRET"];
+    const secret = process.env.RAZORPAY_KEY_SECRET;
 
     if (!secret) {
       throw new Error("Razorpay secret not configured");
@@ -164,14 +176,11 @@ export const verifyRazorpayPayment = createServerFn({
     };
   });
 
-/* =========================
-   GET ORDER STATUS
-========================= */
+/* ---------------- ORDER STATUS ---------------- */
 
 export const getRazorpayOrderStatus = createServerFn({
   method: "POST",
 })
-
   .inputValidator(
     (d: {
       orderId: string;
@@ -185,11 +194,13 @@ export const getRazorpayOrderStatus = createServerFn({
       return d;
     }
   )
+  .handler(async ({ data, request }) => {
+    validateOrigin(request);
 
-  .handler(async ({ data }) => {
     const { keySecret, authorization } = getRazorpayAuth();
 
-    // Local verification
+    /* ---------- VERIFY IF PAYMENT DATA EXISTS ---------- */
+
     if (data.paymentId && data.signature) {
       const valid = verifySignature(
         data.orderId,
@@ -208,7 +219,8 @@ export const getRazorpayOrderStatus = createServerFn({
       }
     }
 
-    // Fetch from Razorpay
+    /* ---------- FETCH ORDER STATUS ---------- */
+
     const res = await fetch(
       `https://api.razorpay.com/v1/orders/${encodeURIComponent(
         data.orderId
