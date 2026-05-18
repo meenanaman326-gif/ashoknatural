@@ -631,4 +631,8 @@ function Checkout() {
     </div>
   </div>
 )}
+
+    </section>
+  );
+}
      
