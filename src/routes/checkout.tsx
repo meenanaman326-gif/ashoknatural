@@ -123,27 +123,44 @@ function Checkout() {
   const handleUPIPayment = () => {
     setShowQRPayment(true);
   };
+const confirmUPIPayment = () => {
+  const txnId = prompt("Enter UPI Transaction ID");
 
-  const confirmUPIPayment = () => {
-    const orderId = "AN" + Math.floor(100000 + Math.random() * 900000);
-    setShowQRPayment(false);
-    
-    // Save order as pending (will be confirmed manually)
-    const orders = JSON.parse(localStorage.getItem("orders") || "[]");
-    orders.push({
-      id: orderId,
-      date: new Date().toISOString(),
-      total: total,
-      items: items,
-      status: "pending",
-      method: "upi",
-    });
-    localStorage.setItem("orders", JSON.stringify(orders));
-    
-    clear();
-    toast.success("Payment initiated! Order placed. We'll confirm after receiving payment.");
-    navigate({ to: "/order-success", search: { id: orderId } as never });
-  };
+  // Validate transaction ID
+  if (!txnId || txnId.trim().length < 8) {
+    toast.error("Please enter a valid UPI transaction ID");
+    return;
+  }
+
+  const orderId = "AN" + Date.now();
+
+  setShowQRPayment(false);
+
+  // Save order for manual verification
+  const orders = JSON.parse(localStorage.getItem("orders") || "[]");
+
+  orders.push({
+    id: orderId,
+    txnId: txnId.trim(),
+    date: new Date().toISOString(),
+    total,
+    items,
+    status: "payment_pending",
+    method: "upi_manual",
+  });
+
+  localStorage.setItem("orders", JSON.stringify(orders));
+
+  clear();
+
+  toast.success("Payment submitted for verification");
+
+  navigate({
+    to: "/order-success",
+    search: { id: orderId } as never,
+  });
+};
+  
 
   const copyUPIID = () => {
     navigator.clipboard.writeText("ashoknaturals@okhdfcbank");
