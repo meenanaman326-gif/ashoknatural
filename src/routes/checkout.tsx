@@ -1,353 +1,395 @@
 /* eslint-disable */
 // @ts-nocheck
+
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useEffect, useRef, useState } from "react";
 import { useServerFn } from "@tanstack/react-start";
-import { CreditCard, Wallet, Truck, Lock, CheckCircle2, QrCode } from "lucide-react";
-import { useCart, findProduct, inr } from "@/lib/cart-store";
+import { useCart, inr } from "@/lib/cart-store";
 import { toast } from "sonner";
+
 import {
-createRazorpayOrder,
-verifyRazorpayPayment,
+  createRazorpayOrder,
+  verifyRazorpayPayment,
 } from "@/lib/razorpay.functions";
+
 import {
-markStoredOrderFailed,
-markStoredOrderPaid,
-saveLastOrder,
-savePendingOrder,
+  markStoredOrderFailed,
+  markStoredOrderPaid,
+  saveLastOrder,
+  savePendingOrder,
 } from "@/lib/order-storage";
 
 declare global {
-interface Window {
-Razorpay?: new (opts: Record<string, unknown>) => {
-open: () => void;
-on: (e: string, cb: (r: unknown) => void) => void;
-};
-}
+  interface Window {
+    Razorpay?: new (opts: Record<string, unknown>) => {
+      open: () => void;
+      on: (e: string, cb: (r: unknown) => void) => void;
+    };
+  }
 }
 
 export const Route = createFileRoute("/checkout")({
-head: () => ({ meta: [{ title: "Checkout — Ashok Naturals" }] }),
-component: Checkout,
+  head: () => ({
+    meta: [{ title: "Checkout — Ashok Naturals" }],
+  }),
+  component: Checkout,
 });
 
 function loadRazorpayScript(): Promise<boolean> {
-return new Promise((resolve) => {
-if (typeof window === "undefined") return resolve(false);
-if (window.Razorpay) return resolve(true);
+  return new Promise((resolve) => {
+    if (typeof window === "undefined") {
+      resolve(false);
+      return;
+    }
 
-const s = document.createElement("script");  
-s.src = "https://checkout.razorpay.com/v1/checkout.js";  
-s.onload = () => resolve(true);  
-s.onerror = () => resolve(false);  
-document.body.appendChild(s);
+    if (window.Razorpay) {
+      resolve(true);
+      return;
+    }
 
-});
+    const script = document.createElement("script");
+
+    script.src = "https://checkout.razorpay.com/v1/checkout.js";
+
+    script.onload = () => resolve(true);
+
+    script.onerror = () => resolve(false);
+
+    document.body.appendChild(script);
+  });
 }
 
-/* ---------------------------
-ORDER ID GENERATOR (UNIFIED)
-----------------------------*/
-const generateOrderId = () => "AN" + Date.now();
+const generateOrderId = () => {
+  return "AN" + Date.now();
+};
 
-/* ---------------------------
-COMPONENT
-----------------------------*/
 function Checkout() {
-const { items, subtotal, clear } = useCart();
-const navigate = useNavigate();
+  const { items, subtotal, clear } = useCart();
 
-const createOrderFn = useServerFn(createRazorpayOrder);
-const verifyFn = useServerFn(verifyRazorpayPayment);
+  const navigate = useNavigate();
 
-const [method, setMethod] = useState<"razorpay" | "cod">("razorpay");
-const [processing, setProcessing] = useState(false);
-const [showQRPayment, setShowQRPayment] = useState(false);
-const [copied, setCopied] = useState(false);
+  const createOrderFn = useServerFn(createRazorpayOrder);
 
-const formRef = useRef<HTMLFormElement>(null);
+  const verifyFn = useServerFn(verifyRazorpayPayment);
 
-useEffect(() => {
-loadRazorpayScript();
-}, []);
+  const [processing, setProcessing] = useState(false);
 
-const shipping = subtotal > 599 ? 0 : 49;
-const gst = Math.round(subtotal * 0.05);
-const total = subtotal + shipping + gst;
+  const formRef = useRef<HTMLFormElement>(null);
 
-/* ---------------------------
-COMPLETE ORDER
-----------------------------*/
-const completeOrder = (paymentInfo: {
-orderId: string;
-paymentId?: string;
-method: "razorpay" | "cod" | "upi_manual";
-status?: "paid" | "confirmed";
-}) => {
-saveLastOrder({
-...paymentInfo,
-status: paymentInfo.status ?? (paymentInfo.method === "cod" ? "confirmed" : "paid"),
-total,
-items,
-});
+  useEffect(() => {
+    loadRazorpayScript();
+  }, []);
 
-clear();  
-toast.success("Order placed successfully!");  
+  const shipping = subtotal > 599 ? 0 : 49;
 
-navigate({  
-  to: "/order-success",  
-  search: { id: paymentInfo.orderId } as never,  
-});
+  const gst = Math.round(subtotal * 0.05);
 
-};
+  const total = subtotal + shipping + gst;
 
-/* ---------------------------
-UPI FLOW
-----------------------------*/
-const handleUPIPayment = () => {
-setShowQRPayment(true);
-};
+  const completeOrder = (paymentInfo: {
+    orderId: string;
+    paymentId?: string;
+    method: "razorpay" | "cod";
+    status?: "paid" | "confirmed";
+  }) => {
+    saveLastOrder({
+      ...paymentInfo,
+      status:
+        paymentInfo.status ??
+        (paymentInfo.method === "cod"
+          ? "confirmed"
+          : "paid"),
+      total,
+      items,
+    });
 
-const confirmUPIPayment = () => {
-const txnId = prompt("Enter UPI Transaction ID");
+    clear();
 
-if (!txnId || txnId.trim().length < 8) {  
-  toast.error("Please enter a valid UPI transaction ID");  
-  return;  
-}  
+    toast.success("Order placed successfully!");
 
-const orderId = generateOrderId();  
-setShowQRPayment(false);  
+    navigate({
+      to: "/order-success",
+      search: {
+        id: paymentInfo.orderId,
+      } as never,
+    });
+  };
 
-const orders = JSON.parse(localStorage.getItem("orders") || "[]");  
+  const placeOrder = async (
+    e: React.FormEvent
+  ) => {
+    e.preventDefault();
 
-orders.push({  
-  id: orderId,  
-  txnId: txnId.trim(),  
-  date: new Date().toISOString(),  
-  total,  
-  items,  
-  status: "payment_pending",  
-  method: "upi_manual",  
-});  
+    setProcessing(true);
 
-localStorage.setItem("orders", JSON.stringify(orders));  
+    try {
+      const ok = await loadRazorpayScript();
 
-clear();  
-toast.success("Payment submitted for verification");  
+      if (!ok || !window.Razorpay) {
+        throw new Error("Razorpay failed to load");
+      }
 
-navigate({  
-  to: "/order-success",  
-  search: { id: orderId } as never,  
-});
+      const order = await createOrderFn({
+        data: {
+          items,
+          receipt: `AN_${Date.now()}`,
+        },
+      });
 
-};
+      if (!order?.orderId || !order?.keyId) {
+        throw new Error("Invalid payment order");
+      }
 
-const copyUPIID = () => {
-navigator.clipboard.writeText("ashoknaturals@okhdfcbank");
-setCopied(true);
-toast.success("UPI ID copied");
-setTimeout(() => setCopied(false), 3000);
-};
+      const form = formRef.current;
 
-const openUPIApp = (app: string) => {
-const upiLink = upi://pay?pa=ashoknaturals@okhdfcbank&pn=Ashok%20Naturals&am=${total}&cu=INR;
+      const get = (name: string) =>
+        (
+          form?.elements.namedItem(
+            name
+          ) as HTMLInputElement | null
+        )?.value ?? "";
 
-const appLinks: Record<string, string> = {  
-  gpay: `tez://upi/pay?pa=ashoknaturals@okhdfcbank&pn=Ashok%20Naturals&am=${total}&cu=INR`,  
-  phonepe: `phonepe://pay?pa=ashoknaturals@okhdfcbank&pn=Ashok%20Naturals&am=${total}`,  
-  paytm: `paytmmp://upi/pay?pa=ashoknaturals@okhdfcbank&pn=Ashok%20Naturals&am=${total}`,  
-};  
+      savePendingOrder({
+        orderId: order.orderId,
+        method: "razorpay",
+        total,
+        items,
+      });
 
-window.location.href = appLinks[app] || upiLink;  
+      const rzp = new window.Razorpay({
+        key: order.keyId,
 
-setTimeout(() => {  
-  if (document.visibilityState === "visible") {  
-    copyUPIID();  
-    toast.info("UPI ID copied if app did not open");  
-  }  
-}, 4000);
+        amount: order.amount,
 
-};
+        currency: order.currency,
 
-/* ---------------------------
-PLACE ORDER (RAZORPAY / COD)
-----------------------------*/
-const placeOrder = async (e: React.FormEvent) => {
-e.preventDefault();
-setProcessing(true);
+        order_id: order.orderId,
 
-if (method === "cod") {  
-  const orderId = generateOrderId();  
-  completeOrder({ orderId, method: "cod", status: "confirmed" });  
-  setProcessing(false);  
-  return;  
-}  
+        name: "Ashok Naturals",
 
-try {  
-  const ok = await loadRazorpayScript();  
-  if (!ok || !window.Razorpay) {  
-    throw new Error("Razorpay failed to load");  
-  }  
+        description:
+          "Pure Indian Spices & Natural Foods",
 
-  const order = await createOrderFn({  
-    data: {  
-      items,  
-      receipt: `AN_${Date.now()}`,  
-    },  
-  });  
+        prefill: {
+          name: `${get("firstName")} ${get(
+            "lastName"
+          )}`.trim(),
 
-  if (!order?.orderId || !order?.keyId) {  
-    throw new Error("Invalid payment order response");  
-  }  
+          email: get("email"),
 
-  const form = formRef.current;  
-  const get = (name: string) =>  
-    (form?.elements.namedItem(name) as HTMLInputElement | null)?.value ?? "";  
+          contact: get("phone"),
+        },
 
-  savePendingOrder({  
-    orderId: order.orderId,  
-    method: "razorpay",  
-    total,  
-    items,  
-  });  
+        notes: {
+          address: `${get(
+            "address1"
+          )} ${get("city")} ${get(
+            "state"
+          )} ${get("pincode")}`,
+        },
 
-  const rzp = new window.Razorpay({  
-    key: order.keyId,  
-    amount: order.amount,  
-    currency: order.currency,  
-    order_id: order.orderId,  
+        handler: async (response: any) => {
+          try {
+            const verified = await verifyFn({
+              data: {
+                orderId:
+                  response.razorpay_order_id,
 
-    name: "Ashok Naturals",  
-    description: "Pure Indian Spices & Natural Foods",  
+                paymentId:
+                  response.razorpay_payment_id,
 
-    prefill: {  
-      name: `${get("firstName")} ${get("lastName")}`.trim(),  
-      email: get("email"),  
-      contact: get("phone"),  
-    },  
+                signature:
+                  response.razorpay_signature,
+              },
+            });
 
-    notes: {  
-      address: `${get("address1")} ${get("address2")} ${get("city")} ${get("state")} ${get("pincode")}`,  
-    },  
+            if (!verified?.valid) {
+              throw new Error(
+                "Payment verification failed"
+              );
+            }
 
-    handler: async (response: any) => {  
-      try {  
-        const verified = await verifyFn({  
-          data: {  
-            orderId: response.razorpay_order_id,  
-            paymentId: response.razorpay_payment_id,  
-            signature: response.razorpay_signature,  
-          },  
-        });  
+            markStoredOrderPaid(
+              response.razorpay_order_id,
+              response.razorpay_payment_id
+            );
 
-        if (!verified?.valid) {  
-          throw new Error("Payment verification failed");  
-        }  
+            completeOrder({
+              orderId:
+                response.razorpay_order_id,
 
-        markStoredOrderPaid(  
-          response.razorpay_order_id,  
-          response.razorpay_payment_id  
-        );  
+              paymentId:
+                response.razorpay_payment_id,
 
-        completeOrder({  
-          orderId: response.razorpay_order_id,  
-          paymentId: response.razorpay_payment_id,  
-          method: "razorpay",  
-          status: "paid",  
-        });  
-      } catch (err) {  
-        console.error(err);  
-        toast.error("Payment verification failed");  
-        setProcessing(false);  
-      }  
-    },  
+              method: "razorpay",
 
-    modal: {  
-      ondismiss: () => {  
-        toast.info("Payment cancelled");  
-        setProcessing(false);  
-      },  
-    },  
+              status: "paid",
+            });
+          } catch (err) {
+            console.error(err);
 
-    theme: { color: "#1f3d2b" },  
-    retry: { enabled: true, max_count: 2 },  
-  });  
+            toast.error(
+              "Payment verification failed"
+            );
 
-  rzp.on("payment.failed", () => {  
-    markStoredOrderFailed(order.orderId, "Payment failed");  
-    toast.error("Payment failed");  
-    setProcessing(false);  
-  });  
+            setProcessing(false);
+          }
+        },
 
-  rzp.open();  
-} catch (err) {  
-  console.error(err);  
-  toast.error(err instanceof Error ? err.message : "Payment error");  
-  setProcessing(false);  
+        modal: {
+          ondismiss: () => {
+            toast.info("Payment cancelled");
+
+            setProcessing(false);
+          },
+        },
+
+        theme: {
+          color: "#1f3d2b",
+        },
+      });
+
+      rzp.on("payment.failed", () => {
+        markStoredOrderFailed(
+          order.orderId,
+          "Payment failed"
+        );
+
+        toast.error("Payment failed");
+
+        setProcessing(false);
+      });
+
+      rzp.open();
+    } catch (err) {
+      console.error(err);
+
+      toast.error(
+        err instanceof Error
+          ? err.message
+          : "Payment error"
+      );
+
+      setProcessing(false);
+    }
+  };
+
+  if (items.length === 0) {
+    return (
+      <section className="container-x py-24 text-center">
+        <h1 className="text-3xl font-bold">
+          Your cart is empty
+        </h1>
+      </section>
+    );
+  }
+
+  return (
+    <section className="container-x py-12">
+      <h1 className="text-4xl font-bold mb-8">
+        Checkout
+      </h1>
+
+      <form
+        ref={formRef}
+        onSubmit={placeOrder}
+        className="grid lg:grid-cols-2 gap-8"
+      >
+        <div className="space-y-4">
+          <input
+            name="firstName"
+            placeholder="First Name"
+            className="w-full border p-3 rounded-xl"
+            required
+          />
+
+          <input
+            name="lastName"
+            placeholder="Last Name"
+            className="w-full border p-3 rounded-xl"
+            required
+          />
+
+          <input
+            name="email"
+            type="email"
+            placeholder="Email"
+            className="w-full border p-3 rounded-xl"
+            required
+          />
+
+          <input
+            name="phone"
+            placeholder="Phone"
+            className="w-full border p-3 rounded-xl"
+            required
+          />
+
+          <input
+            name="address1"
+            placeholder="Address"
+            className="w-full border p-3 rounded-xl"
+            required
+          />
+
+          <input
+            name="city"
+            placeholder="City"
+            className="w-full border p-3 rounded-xl"
+            required
+          />
+
+          <input
+            name="state"
+            placeholder="State"
+            className="w-full border p-3 rounded-xl"
+            required
+          />
+
+          <input
+            name="pincode"
+            placeholder="Pincode"
+            className="w-full border p-3 rounded-xl"
+            required
+          />
+        </div>
+
+        <div className="border rounded-2xl p-6 h-fit">
+          <h2 className="text-2xl font-bold mb-4">
+            Order Summary
+          </h2>
+
+          <div className="space-y-2">
+            <p>
+              Subtotal: {inr(subtotal)}
+            </p>
+
+            <p>
+              Shipping: {inr(shipping)}
+            </p>
+
+            <p>
+              GST: {inr(gst)}
+            </p>
+
+            <p className="font-bold text-xl pt-3">
+              Total: {inr(total)}
+            </p>
+          </div>
+
+          <button
+            type="submit"
+            disabled={processing}
+            className="w-full mt-6 bg-black text-white py-3 rounded-xl"
+          >
+            {processing
+              ? "Processing..."
+              : `Pay ${inr(total)}`}
+          </button>
+        </div>
+      </form>
+    </section>
+  );
 }
 
-};
-
-/* ---------------------------
-UI (UNCHANGED)
-----------------------------*/
-if (items.length === 0) {
-return (
-<section className="container-x py-24 text-center">
-<h1 className="font-display text-3xl text-primary">Your cart is empty</h1>
-</section>
-);
-}
-
-return (
-<section className="container-x py-12">
-<h1 className="font-display text-4xl md:text-5xl text-primary mb-8">
-Checkout
-</h1>
-
-<form ref={formRef} onSubmit={placeOrder} className="grid lg:grid-cols-3 gap-8">  
-    {/* KEEP YOUR UI EXACTLY SAME (UNCHANGED FOR BREVITY) */}  
-    {/* Everything below payment UI remains identical to your code */}  
-  </form>  
-
-  {/* UPI MODAL (UNCHANGED) */}  
-  {showQRPayment && (  
-    <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 p-4">  
-      <div className="bg-white rounded-3xl max-w-md w-full overflow-hidden shadow-2xl">  
-        <div className="bg-gradient-to-r from-green-600 to-emerald-500 px-6 py-5 text-white text-center">  
-          <h3 className="text-2xl font-bold">Pay with UPI</h3>  
-        </div>  
-
-        <div className="p-6 text-center">  
-          <img  
-            src="/images/payment-qr.png"  
-            className="w-full max-w-xs mx-auto"  
-          />  
-
-          <p className="mt-3 font-bold">Amount: {inr(total)}</p>  
-
-          <div className="mt-4 flex gap-2">  
-            <button onClick={copyUPIID} className="flex-1 bg-green-600 text-white py-2 rounded">  
-              {copied ? "Copied" : "Copy UPI"}  
-            </button>  
-
-            <button onClick={confirmUPIPayment} className="flex-1 bg-gray-800 text-white py-2 rounded">  
-              I've Paid  
-            </button>  
-          </div>  
-
-          <button  
-            onClick={() => setShowQRPayment(false)}  
-            className="mt-3 text-sm text-gray-500"  
-          >  
-            Cancel  
-          </button>  
-        </div>  
-      </div>  
-    </div>  
-  )}  
-</section>
-
-);
-}
+export default Checkout;
