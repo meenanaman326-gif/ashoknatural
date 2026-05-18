@@ -18,8 +18,24 @@ function getRazorpayAuth() {
 }
 
 export const createRazorpayOrder = createServerFn({ method: "POST" })
-  .inputValidator((data: { amount: number; currency?: string; receipt?: string }) => {
-    if (!data || typeof data.amount !== "number" || data.amount <= 0) {
+  .inputValidator((data: {
+  items: {
+    productId: string;
+    qty: number;
+    weightLabel: string;
+    price: number;
+  }[];
+  receipt?: string;
+}) => {
+  if (!data?.items?.length) {
+    throw new Error("No items");
+  }
+
+  return {
+    items: data.items,
+    receipt: data.receipt ?? `rcpt_${Date.now()}`,
+  };
+})
       throw new Error("Invalid amount");
     }
     return {
@@ -113,3 +129,4 @@ export const getRazorpayOrderStatus = createServerFn({ method: "POST" })
       attempts: order.attempts ?? 0,
     };
   });
+      
