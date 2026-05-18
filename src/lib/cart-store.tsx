@@ -16,7 +16,7 @@ type CartState = {
   updateQty: (productId: string, weightLabel: string, qty: number) => void;
   clear: () => void;
 
-  subtotal: number;
+  subtotal: () => number;
 };
 
 export const useCart = create<CartState>()(
@@ -65,10 +65,16 @@ export const useCart = create<CartState>()(
 
       clear: () => set({ items: [] }),
 
-      subtotal: 0,
+      subtotal: () => {
+        const items = get().items;
+        return items.reduce((sum, i) => sum + i.price * i.qty, 0);
+      },
     }),
     {
-      name: "ashok-cart-storage", // 🔥 IMPORTANT
+      name: "ashok-cart-storage",
+
+      // 🔥 IMPORTANT FOR TANSTACK START / SSR
+      skipHydration: true,
     }
   )
 );
