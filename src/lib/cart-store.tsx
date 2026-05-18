@@ -1,78 +1,74 @@
-import { createContext, useContext, useEffect, useState, type ReactNode } from "react";
-import { products, type Product } from "./products";
+import { create } from "zustand";
+import { persist } from "zustand/middleware";
 
 export type CartItem = {
   productId: string;
-  weightLabel: string;
-  price: number;
   qty: number;
+  price: number;
+  weightLabel: string;
 };
 
-type CartCtx = {
+type CartState = {
   items: CartItem[];
-  add: (p: Product, weightLabel: string) => void;
-  remove: (productId: string, weightLabel: string) => void;
-  setQty: (productId: string, weightLabel: string, qty: number) => void;
+
+  addItem: (item: CartItem) => void;
+  removeItem: (productId: string, weightLabel: string) => void;
+  updateQty: (productId: string, weightLabel: string, qty: number) => void;
   clear: () => void;
-  count: number;
+
   subtotal: number;
-  wishlist: string[];
-  toggleWishlist: (id: string) => void;
 };
 
-const Ctx = createContext<CartCtx | null>(null);
+export const useCart = create<CartState>()(
+  persist(
+    (set, get) => ({
+      items: [],
 
-export function CartProvider({ children }: { children: ReactNode }) {
-  const [items, setItems] = useState<CartItem[]>([]);
-  const [wishlist, setWishlist] = useState<string[]>([]);
+      addItem: (item) =>
+        set((state) => {
+          const existing = state.items.find(
+            (i) =>
+              i.productId === item.productId &&
+              i.weightLabel === item.weightLabel
+          );
 
-  useEffect(() => {
-    try {
-      const c = localStorage.getItem("an_cart");
-      const w = localStorage.getItem("an_wish");
-      if (c) setItems(JSON.parse(c));
-      if (w) setWishlist(JSON.parse(w));
-    } catch {}
-  }, []);
-  useEffect(() => { localStorage.setItem("an_cart", JSON.stringify(items)); }, [items]);
-  useEffect(() => { localStorage.setItem("an_wish", JSON.stringify(wishlist)); }, [wishlist]);
+          if (existing) {
+            return {
+              items: state.items.map((i) =>
+                i.productId === item.productId &&
+                i.weightLabel === item.weightLabel
+                  ? { ...i, qty: i.qty + item.qty }
+                  : i
+              ),
+            };
+          }
 
-  const add = (p: Product, weightLabel: string) => {
-    const w = p.weights.find(x => x.label === weightLabel) ?? p.weights[0];
-    setItems(prev => {
-      const i = prev.findIndex(x => x.productId === p.id && x.weightLabel === w.label);
-      if (i >= 0) {
-        const next = [...prev];
-        next[i] = { ...next[i], qty: next[i].qty + 1 };
-        return next;
-      }
-      return [...prev, { productId: p.id, weightLabel: w.label, price: w.price, qty: 1 }];
-    });
-  };
-  const remove = (id: string, w: string) =>
-    setItems(prev => prev.filter(x => !(x.productId === id && x.weightLabel === w)));
-  const setQty = (id: string, w: string, qty: number) =>
-    setItems(prev =>
-      prev.map(x => (x.productId === id && x.weightLabel === w ? { ...x, qty: Math.max(1, qty) } : x))
-    );
-  const clear = () => setItems([]);
-  const count = items.reduce((s, i) => s + i.qty, 0);
-  const subtotal = items.reduce((s, i) => s + i.qty * i.price, 0);
-  const toggleWishlist = (id: string) =>
-    setWishlist(prev => (prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id]));
+          return { items: [...state.items, item] };
+        }),
 
-  return (
-    <Ctx.Provider value={{ items, add, remove, setQty, clear, count, subtotal, wishlist, toggleWishlist }}>
-      {children}
-    </Ctx.Provider>
-  );
-}
+      removeItem: (productId, weightLabel) =>
+        set((state) => ({
+          items: state.items.filter(
+            (i) =>
+              !(i.productId === productId && i.weightLabel === weightLabel)
+          ),
+        })),
 
-export const useCart = () => {
-  const c = useContext(Ctx);
-  if (!c) throw new Error("CartProvider missing");
-  return c;
-};
+      updateQty: (productId, weightLabel, qty) =>
+        set((state) => ({
+          items: state.items.map((i) =>
+            i.productId === productId && i.weightLabel === weightLabel
+              ? { ...i, qty }
+              : i
+          ),
+        })),
 
-export const findProduct = (id: string) => products.find(p => p.id === id);
-export const inr = (n: number) => `₹${n.toLocaleString("en-IN")}`;
+      clear: () => set({ items: [] }),
+
+      subtotal: 0,
+    }),
+    {
+      name: "ashok-cart-storage", // 🔥 IMPORTANT
+    }
+  )
+);
