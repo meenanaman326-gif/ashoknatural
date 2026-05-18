@@ -219,8 +219,11 @@ const confirmUPIPayment = () => {
         throw new Error("Razorpay failed to load. Check your connection.");
 
       const order = await createOrderFn({
-        data: { amount: total, currency: "INR", receipt: `AN_${Date.now()}` },
-      });
+  data: {
+    items,
+    receipt: `AN_${Date.now()}`,
+  },
+});
       if (!order?.orderId || !order?.keyId) throw new Error("Invalid payment order response");
 
       const form = formRef.current;
