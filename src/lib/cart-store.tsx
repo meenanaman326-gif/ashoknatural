@@ -1,72 +1,84 @@
-import { create } from "zustand";
-import { persist } from "zustand/middleware";
+import React, { createContext, useContext, useEffect, useState } from "react";
 
-export type CartItem = {
-  productId: string;
-  qty: number;
+type CartItem = {
+  id: string;
+  name: string;
   price: number;
-  weightLabel: string;
+  image?: string;
+  quantity: number;
 };
 
-type CartState = {
-  items: CartItem[];
-  subtotal: number;
-
-  addItem: (item: CartItem) => void;
-  removeItem: (productId: string, weightLabel: string) => void;
-  updateQty: (productId: string, weightLabel: string, qty: number) => void;
-  clear: () => void;
+type CartContextType = {
+  cart: CartItem[];
+  addToCart: (item: Omit<CartItem, "quantity">) => void;
+  removeFromCart: (id: string) => void;
+  clearCart: () => void;
 };
 
-export const useCart = create<CartState>()(
-  persist(
-    (set) => ({
-      items: [],
-      subtotal: 0,
+const CartContext = createContext<CartContextType | null>(null);
 
-      addItem: (item) =>
-        set((state) => {
-          const existing = state.items.find(
-            (i) =>
-              i.productId === item.productId &&
-              i.weightLabel === item.weightLabel
-          );
+export const CartProvider = ({
+  children,
+}: {
+  children: React.ReactNode;
+}) => {
+  const [cart, setCart] = useState<CartItem[]>([]);
 
-          if (existing) {
-            return {
-              items: state.items.map((i) =>
-                i.productId === item.productId &&
-                i.weightLabel === item.weightLabel
-                  ? { ...i, qty: i.qty + item.qty }
-                  : i
-              ),
-            };
-          }
-
-          return { items: [...state.items, item] };
-        }),
-
-      removeItem: (productId, weightLabel) =>
-        set((state) => ({
-          items: state.items.filter(
-            (i) =>
-              !(i.productId === productId && i.weightLabel === weightLabel)
-          ),
-        })),
-
-      updateQty: (productId, weightLabel, qty) =>
-        set((state) => ({
-          items: state.items.map((i) =>
-            i.productId === productId && i.weightLabel === weightLabel
-              ? { ...i, qty }
-              : i
-          ),
-        })),
-
-      clear: () => set({ items: [] }),
-    }),
-    {
-      name: "ashok-cart-storage",
+  useEffect(() => {
+    const savedCart = localStorage.getItem("cart");
+    if (savedCart) {
+      setCart(JSON.parse(savedCart));
     }
-  )
-);
+  }, []);
+
+  useEffect(() => {
+    localStorage.setItem("cart", JSON.stringify(cart));
+  }, [cart]);
+
+  const addToCart = (item: Omit<CartItem, "quantity">) => {
+    setCart((prev) => {
+      const existing = prev.find((p) => p.id === item.id);
+
+      if (existing) {
+        return prev.map((p) =>
+          p.id === item.id
+            ? { ...p, quantity: p.quantity + 1 }
+            : p
+        );
+      }
+
+      return [...prev, { ...item, quantity: 1 }];
+    });
+  };
+
+  const removeFromCart = (id: string) => {
+    setCart((prev) => prev.filter((item) => item.id !== id));
+  };
+
+  const clearCart = () => {
+    setCart([]);
+  };
+
+  return (
+    <CartContext.Provider
+      value={{
+        cart,
+        addToCart,
+        removeFromCart,
+        clearCart,
+      }}
+    >
+      {children}
+    </CartContext.Provider>
+  );
+};
+
+export const useCart = () => {
+  const context = useContext(CartContext);
+
+  if (!context) {
+    throw new Error("useCart must be used inside CartProvider");
+  }
+
+  return context;
+};
