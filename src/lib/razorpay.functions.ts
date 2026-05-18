@@ -1,51 +1,84 @@
+
 import { createServerFn } from "@tanstack/react-start";
 import { createHmac } from "crypto";
 
-function verifySignature(orderId: string, paymentId: string, signature: string, secret: string) {
-  const expected = createHmac("sha256", secret).update(`${orderId}|${paymentId}`).digest("hex");
+/* =========================
+   HELPERS
+========================= */
+
+function verifySignature(
+  orderId: string,
+  paymentId: string,
+  signature: string,
+  secret: string
+) {
+  const expected = createHmac("sha256", secret)
+    .update(`${orderId}|${paymentId}`)
+    .digest("hex");
+
   return expected === signature;
 }
 
 function getRazorpayAuth() {
-  const keyId = process.env.RAZORPAY_KEY_ID;
-  const keySecret = process.env.RAZORPAY_KEY_SECRET;
-  if (!keyId || !keySecret) throw new Error("Razorpay keys not configured");
-  return {
-    keyId,
-    keySecret,
-    authorization: `Basic ${Buffer.from(`${keyId}:${keySecret}`).toString("base64")}`,
-  };
-}
+  const keyId = process.env["RAZORPAY_KEY_ID"];
+  const keySecret = process.env["RAZORPAY_KEY_SECRET"];
 
-export const createRazorpayOrder = createServerFn({ method: "POST" })
-  .inputValidator((data: {
-  items: {
-    productId: string;
-    qty: number;
-    weightLabel: string;
-    price: number;
-  }[];
-  receipt?: string;
-}) => {
-  if (!data?.items?.length) {
-    throw new Error("No items");
+  if (!keyId || !keySecret) {
+    throw new Error("Razorpay keys not configured");
   }
 
   return {
-    items: data.items,
-    receipt: data.receipt ?? `rcpt_${Date.now()}`,
+    keyId,
+    keySecret,
+    authorization: `Basic ${Buffer.from(
+      `${keyId}:${keySecret}`
+    ).toString("base64")}`,
   };
+}
+
+/* =========================
+   CREATE ORDER
+========================= */
+
+export const createRazorpayOrder = createServerFn({
+  method: "POST",
 })
-      throw new Error("Invalid amount");
+
+  .inputValidator(
+    (data: {
+      items: {
+        productId: string;
+        qty: number;
+        weightLabel: string;
+        price: number;
+      }[];
+      receipt?: string;
+    }) => {
+      if (!data?.items?.length) {
+        throw new Error("No items");
+      }
+
+      return {
+        items: data.items,
+        receipt: data.receipt ?? `rcpt_${Date.now()}`,
+      };
     }
-    return {
-      amount: Math.round(data.amount),
-      currency: data.currency ?? "INR",
-      receipt: data.receipt ?? `rcpt_${Date.now()}`,
-    };
-  })
+  )
+
   .handler(async ({ data }) => {
+    // Server-side total calculation
+    const subtotal = data.items.reduce(
+      (sum, item) => sum + item.price * item.qty,
+      0
+    );
+
+    const shipping = subtotal > 599 ? 0 : 49;
+    const gst = Math.round(subtotal * 0.05);
+
+    const finalAmount = subtotal + shipping + gst;
+
     const { keyId, authorization } = getRazorpayAuth();
+
     const res = await fetch("https://api.razorpay.com/v1/orders", {
       method: "POST",
       headers: {
@@ -53,8 +86,8 @@ export const createRazorpayOrder = createServerFn({ method: "POST" })
         "Content-Type": "application/json",
       },
       body: JSON.stringify({
-        amount: data.amount * 100, // paise
-        currency: data.currency,
+        amount: finalAmount * 100,
+        currency: "INR",
         receipt: data.receipt,
         payment_capture: 1,
       }),
@@ -62,23 +95,66 @@ export const createRazorpayOrder = createServerFn({ method: "POST" })
 
     if (!res.ok) {
       const err = await res.text();
+
       console.error("Razorpay order error:", err);
+
       throw new Error("Failed to create payment order");
     }
-    const order = (await res.json()) as { id: string; amount: number; currency: string };
-    return { orderId: order.id, amount: order.amount, currency: order.currency, keyId };
+
+    const order = (await res.json()) as {
+      id: string;
+      amount: number;
+      currency: string;
+    };
+
+    return {
+      orderId: order.id,
+      amount: order.amount,
+      currency: order.currency,
+      keyId,
+    };
   });
 
-export const verifyRazorpayPayment = createServerFn({ method: "POST" })
-  .inputValidator((d: { orderId: string; paymentId: string; signature: string }) => {
-    if (!d?.orderId || !d?.paymentId || !d?.signature) throw new Error("Missing fields");
-    return d;
-  })
+/* =========================
+   VERIFY PAYMENT
+========================= */
+
+export const verifyRazorpayPayment = createServerFn({
+  method: "POST",
+})
+
+  .inputValidator(
+    (d: {
+      orderId: string;
+      paymentId: string;
+      signature: string;
+    }) => {
+      if (!d?.orderId || !d?.paymentId || !d?.signature) {
+        throw new Error("Missing fields");
+      }
+
+      return d;
+    }
+  )
+
   .handler(async ({ data }) => {
-    const secret = process.env.RAZORPAY_KEY_SECRET;
-    if (!secret) throw new Error("Razorpay secret not configured");
-    const valid = verifySignature(data.orderId, data.paymentId, data.signature, secret);
-    if (!valid) throw new Error("Payment signature verification failed");
+    const secret = process.env["RAZORPAY_KEY_SECRET"];
+
+    if (!secret) {
+      throw new Error("Razorpay secret not configured");
+    }
+
+    const valid = verifySignature(
+      data.orderId,
+      data.paymentId,
+      data.signature,
+      secret
+    );
+
+    if (!valid) {
+      throw new Error("Payment signature verification failed");
+    }
+
     return {
       valid: true,
       paid: true,
@@ -88,30 +164,67 @@ export const verifyRazorpayPayment = createServerFn({ method: "POST" })
     };
   });
 
-export const getRazorpayOrderStatus = createServerFn({ method: "POST" })
-  .inputValidator((d: { orderId: string; paymentId?: string; signature?: string }) => {
-    if (!d?.orderId) throw new Error("Missing order id");
-    return d;
-  })
+/* =========================
+   GET ORDER STATUS
+========================= */
+
+export const getRazorpayOrderStatus = createServerFn({
+  method: "POST",
+})
+
+  .inputValidator(
+    (d: {
+      orderId: string;
+      paymentId?: string;
+      signature?: string;
+    }) => {
+      if (!d?.orderId) {
+        throw new Error("Missing order id");
+      }
+
+      return d;
+    }
+  )
+
   .handler(async ({ data }) => {
     const { keySecret, authorization } = getRazorpayAuth();
 
+    // Local verification
     if (data.paymentId && data.signature) {
-      const valid = verifySignature(data.orderId, data.paymentId, data.signature, keySecret);
-      if (valid)
-        return { status: "paid", paid: true, orderId: data.orderId, paymentId: data.paymentId };
+      const valid = verifySignature(
+        data.orderId,
+        data.paymentId,
+        data.signature,
+        keySecret
+      );
+
+      if (valid) {
+        return {
+          status: "paid",
+          paid: true,
+          orderId: data.orderId,
+          paymentId: data.paymentId,
+        };
+      }
     }
 
+    // Fetch from Razorpay
     const res = await fetch(
-      `https://api.razorpay.com/v1/orders/${encodeURIComponent(data.orderId)}`,
+      `https://api.razorpay.com/v1/orders/${encodeURIComponent(
+        data.orderId
+      )}`,
       {
-        headers: { Authorization: authorization },
-      },
+        headers: {
+          Authorization: authorization,
+        },
+      }
     );
 
     if (!res.ok) {
       const err = await res.text();
+
       console.error("Razorpay status error:", err);
+
       throw new Error("Could not check payment status");
     }
 
@@ -121,7 +234,10 @@ export const getRazorpayOrderStatus = createServerFn({ method: "POST" })
       amount_paid?: number;
       attempts?: number;
     };
-    const paid = order.status === "paid" || (order.amount_paid ?? 0) > 0;
+
+    const paid =
+      order.status === "paid" || (order.amount_paid ?? 0) > 0;
+
     return {
       status: paid ? "paid" : order.status,
       paid,
@@ -129,4 +245,3 @@ export const getRazorpayOrderStatus = createServerFn({ method: "POST" })
       attempts: order.attempts ?? 0,
     };
   });
-      
