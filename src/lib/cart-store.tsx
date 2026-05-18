@@ -10,19 +10,19 @@ export type CartItem = {
 
 type CartState = {
   items: CartItem[];
+  subtotal: number;
 
   addItem: (item: CartItem) => void;
   removeItem: (productId: string, weightLabel: string) => void;
   updateQty: (productId: string, weightLabel: string, qty: number) => void;
   clear: () => void;
-
-  subtotal: () => number;
 };
 
 export const useCart = create<CartState>()(
   persist(
-    (set, get) => ({
+    (set) => ({
       items: [],
+      subtotal: 0,
 
       addItem: (item) =>
         set((state) => {
@@ -64,17 +64,9 @@ export const useCart = create<CartState>()(
         })),
 
       clear: () => set({ items: [] }),
-
-      subtotal: () => {
-        const items = get().items;
-        return items.reduce((sum, i) => sum + i.price * i.qty, 0);
-      },
     }),
     {
       name: "ashok-cart-storage",
-
-      // 🔥 IMPORTANT FOR TANSTACK START / SSR
-      skipHydration: true,
     }
   )
 );
