@@ -1,84 +1,58 @@
-import React, { createContext, useContext, useEffect, useState } from "react";
+import { Card, CardContent } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { ShoppingCart } from "lucide-react";
+import { useCart } from "@/lib/cart-store";
 
-type CartItem = {
+type Product = {
   id: string;
   name: string;
   price: number;
   image?: string;
-  quantity: number;
+  description?: string;
 };
 
-type CartContextType = {
-  cart: CartItem[];
-  addToCart: (item: Omit<CartItem, "quantity">) => void;
-  removeFromCart: (id: string) => void;
-  clearCart: () => void;
-};
+export function ProductCard({ product }: { product: Product }) {
+  const { addToCart } = useCart();
 
-const CartContext = createContext<CartContextType | null>(null);
-
-export const CartProvider = ({
-  children,
-}: {
-  children: React.ReactNode;
-}) => {
-  const [cart, setCart] = useState<CartItem[]>([]);
-
-  useEffect(() => {
-    const savedCart = localStorage.getItem("cart");
-    if (savedCart) {
-      setCart(JSON.parse(savedCart));
-    }
-  }, []);
-
-  useEffect(() => {
-    localStorage.setItem("cart", JSON.stringify(cart));
-  }, [cart]);
-
-  const addToCart = (item: Omit<CartItem, "quantity">) => {
-    setCart((prev) => {
-      const existing = prev.find((p) => p.id === item.id);
-
-      if (existing) {
-        return prev.map((p) =>
-          p.id === item.id
-            ? { ...p, quantity: p.quantity + 1 }
-            : p
-        );
-      }
-
-      return [...prev, { ...item, quantity: 1 }];
+  const handleAddToCart = () => {
+    addToCart({
+      id: product.id,
+      name: product.name,
+      price: product.price,
+      image: product.image,
     });
   };
 
-  const removeFromCart = (id: string) => {
-    setCart((prev) => prev.filter((item) => item.id !== id));
-  };
-
-  const clearCart = () => {
-    setCart([]);
-  };
-
   return (
-    <CartContext.Provider
-      value={{
-        cart,
-        addToCart,
-        removeFromCart,
-        clearCart,
-      }}
-    >
-      {children}
-    </CartContext.Provider>
+    <Card className="rounded-2xl overflow-hidden shadow-md">
+      <CardContent className="p-4">
+        <img
+          src={product.image}
+          alt={product.name}
+          className="w-full h-48 object-cover rounded-xl"
+        />
+
+        <div className="mt-4">
+          <h2 className="text-lg font-semibold">{product.name}</h2>
+
+          {product.description && (
+            <p className="text-sm text-muted-foreground mt-1">
+              {product.description}
+            </p>
+          )}
+
+          <div className="flex items-center justify-between mt-4">
+            <span className="text-xl font-bold">
+              ₹{product.price}
+            </span>
+
+            <Button onClick={handleAddToCart}>
+              <ShoppingCart className="w-4 h-4 mr-2" />
+              Add to Cart
+            </Button>
+          </div>
+        </div>
+      </CardContent>
+    </Card>
   );
-};
-
-export const useCart = () => {
-  const context = useContext(CartContext);
-
-  if (!context) {
-    throw new Error("useCart must be used inside CartProvider");
-  }
-
-  return context;
-};
+}
