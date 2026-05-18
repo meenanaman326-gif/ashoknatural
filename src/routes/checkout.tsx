@@ -69,15 +69,21 @@ function Checkout() {
       setProcessing(true);
       (async () => {
         try {
-          if (rzpSignature) {
-            await verifyFn({
-              data: {
-                orderId: rzpOrderId,
-                paymentId: rzpPaymentId,
-                signature: rzpSignature,
-              },
-            });
-          }
+          if (!rzpSignature) {
+  throw new Error("Missing payment signature");
+}
+
+const verified = await verifyFn({
+  data: {
+    orderId: rzpOrderId,
+    paymentId: rzpPaymentId,
+    signature: rzpSignature,
+  },
+});
+
+if (!verified?.valid) {
+  throw new Error("Payment verification failed");
+}
           const paid = markStoredOrderPaid(rzpOrderId, rzpPaymentId);
           saveLastOrder({
             orderId: rzpOrderId,
