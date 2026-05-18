@@ -262,8 +262,8 @@ const confirmUPIPayment = () => {
         notes: {
           address: `${get("address1")} ${get("address2")} ${get("city")} ${get("state")} ${get("pincode")}`,
         },
-        callback_url: callbackUrl,
-        redirect: true,
+        
+        redirect: false,
         theme: { color: "#1f3d2b" },
         retry: { enabled: true, max_count: 2 },
         send_sms_hash: true,
