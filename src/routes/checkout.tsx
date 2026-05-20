@@ -17,6 +17,7 @@ import {
   savePendingOrder,
   getStoredOrder,
 } from "@/lib/order-storage";
+import { sendOrderEmail } from "@/server/send-order-email";
 
 declare global {
   interface Window {
