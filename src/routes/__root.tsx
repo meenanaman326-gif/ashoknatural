@@ -74,35 +74,15 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
 
 function RootComponent() {
   const { queryClient } = Route.useRouteContext();
-
   return (
     <QueryClientProvider client={queryClient}>
       <CartProvider>
-
         <div className="min-h-screen flex flex-col">
           <Header />
-
-          <main className="flex-1">
-            <Outlet />
-          </main>
-
+          <main className="flex-1"><Outlet /></main>
           <Footer />
-
-          <a
-            href="https://wa.me/919414857764?text=Hello%20Ashok%20Ashok%20Naturals"
-            target="_blank"
-            rel="noopener noreferrer"
-            className="fixed bottom-5 right-5 z-50"
-          >
-            <div className="bg-green-500 text-white p-4 rounded-full shadow-lg">
-              WhatsApp
-            </div>
-          </a>
-
         </div>
-
         <Toaster />
-
       </CartProvider>
     </QueryClientProvider>
   );
