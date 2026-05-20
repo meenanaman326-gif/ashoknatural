@@ -71,12 +71,14 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
   notFoundComponent: NotFoundComponent,
   errorComponent: ErrorComponent,
 });
+
 function RootComponent() {
   const { queryClient } = Route.useRouteContext();
 
   return (
     <QueryClientProvider client={queryClient}>
       <CartProvider>
+
         <div className="min-h-screen flex flex-col">
           <Header />
 
@@ -86,28 +88,21 @@ function RootComponent() {
 
           <Footer />
 
-          {/* WhatsApp Floating Button */}
           <a
-            href="https://wa.me/919414857764?text=Hello%20Ashok%20Naturals"
+            href="https://wa.me/919414857764?text=Hello%20Ashok%20Ashok%20Naturals"
             target="_blank"
             rel="noopener noreferrer"
             className="fixed bottom-5 right-5 z-50"
           >
-            <div className="bg-green-500 hover:bg-green-600 text-white p-4 rounded-full shadow-lg transition-all duration-300 animate-bounce">
-              <svg
-                xmlns="http://www.w3.org/2000/svg"
-                width="28"
-                height="28"
-                fill="currentColor"
-                viewBox="0 0 24 24"
-              >
-                <path d="M20.52 3.48A11.86 11.86 0 0012.06 0C5.5 0 .16 5.35.16 11.93c0 2.1.55 4.15 1.6 5.96L0 24l6.3-1.65a11.87 11.87 0 005.76 1.47h.01c6.56 0 11.9-5.35 11.9-11.93 0-3.19-1.24-6.18-3.45-8.4zM12.07 21.3a9.3 9.3 0 01-4.74-1.3l-.34-.2-3.74.98 1-3.64-.22-.37a9.33 9.33 0 01-1.42-4.97c0-5.14 4.19-9.33 9.35-9.33 2.5 0 4.85.97 6.62 2.74a9.27 9.27 0 012.74 6.6c0 5.15-4.2 9.34-9.35 9.34z" />
-              </svg>
+            <div className="bg-green-500 text-white p-4 rounded-full shadow-lg">
+              WhatsApp
             </div>
           </a>
+
         </div>
 
         <Toaster />
+
       </CartProvider>
     </QueryClientProvider>
   );
