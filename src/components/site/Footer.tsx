@@ -129,7 +129,7 @@ export function Footer() {
             <li className="flex gap-2">
               <MapPin className="w-4 h-4 mt-0.5 shrink-0 text-gold" />
               <span>
-                24, Spice Market Rd, Erode, Tamil Nadu 638001
+                Dolika, Rajasthan 303304
               </span>
             </li>
 
