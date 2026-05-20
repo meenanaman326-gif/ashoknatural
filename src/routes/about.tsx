@@ -19,7 +19,7 @@ export const Route = createFileRoute("/about")({
       {
         name: "description",
         content:
-          "Pure farm-grown spices from Dholika, Rajasthan.",
+          "Pure farm-grown spices from Dolika, Rajasthan.",
       },
     ],
   }),
@@ -34,19 +34,17 @@ function About() {
       <section className="bg-gradient-hero text-primary-foreground py-24">
         <div className="container-x max-w-3xl">
           <p className="text-[10px] tracking-[0.4em] uppercase text-gold mb-3">
-            Since 2025 • Dholika, Rajasthan
+            Since 2025 | Dolika, Rajasthan
           </p>
 
           <h1 className="font-display text-5xl md:text-7xl text-balance">
-            Pure farm-grown spices from the heart of Rajasthan.
+            Pure farm-grown spices from Rajasthan.
           </h1>
 
           <p className="mt-6 text-lg text-primary-foreground/85">
-            Ashok Naturals began in Dholika, Rajasthan
-            with one simple mission — grow what we
-            sell, and sell what we grow. No middlemen,
-            no artificial mixing, and no compromise on
-            purity.
+            Unlike most brands that source from multiple vendors,
+            Ashok Naturals is built on a single, simple foundation
+            — our own farm.
           </p>
         </div>
       </section>
@@ -70,22 +68,14 @@ function About() {
           </h2>
 
           <p className="text-muted-foreground leading-relaxed">
-            Unlike most brands that source from
-            multiple vendors, Ashok Naturals is built
-            on a single, simple foundation — our own
-            farm in Dholika, Rajasthan. Started in
-            2025, our mission is clear: grow what we
-            sell and deliver completely pure spices
-            directly from our fields to your kitchen.
+            Located in Dolika, Rajasthan (303304), our journey
+            started in 2025 with a clear mission: grow what we
+            sell, and sell what we grow.
           </p>
 
           <p className="text-muted-foreground leading-relaxed">
-            We do not mix inferior grains,
-            artificial colors, starch fillers, or
-            synthetic aroma enhancers. Every product
-            is harvested, processed, and packed with
-            complete transparency using traditional
-            methods and absolute attention to purity.
+            No middlemen. No external procurement. No uncertainty
+            about origin.
           </p>
         </div>
       </section>
@@ -98,7 +88,7 @@ function About() {
           </p>
 
           <h2 className="font-display text-4xl md:text-5xl text-primary">
-            Our Values
+            Absolute Purity
           </h2>
         </div>
 
@@ -106,38 +96,38 @@ function About() {
           {[
             {
               icon: Leaf,
-              t: "100% Pure",
-              d: "No fillers, no starch, no artificial mixing.",
+              t: "No Mixing",
+              d: "No inferior grains or starch fillers.",
             },
 
             {
               icon: Heart,
-              t: "Farm Direct",
-              d: "Every spice comes directly from our own farm in Dholika, Rajasthan.",
+              t: "No Artificial Colors",
+              d: "No chemical color enhancers or synthetic aroma.",
             },
 
             {
               icon: Sprout,
-              t: "Traditional Methods",
-              d: "Processed carefully using traditional farming and grinding practices.",
+              t: "Farm-Grown",
+              d: "Every spice is grown on our own land in Dolika.",
             },
 
             {
               icon: Globe,
-              t: "Single Origin",
-              d: "Complete traceability from our fields to your kitchen.",
+              t: "Traditional Methods",
+              d: "Processed carefully using traditional methods.",
             },
 
             {
               icon: Users,
-              t: "Customer Trust",
-              d: "Built on honesty, transparency, and long-term customer relationships.",
+              t: "Single-Origin",
+              d: "100% original product from seed to package.",
             },
 
             {
               icon: Award,
-              t: "No Compromise",
-              d: "Every batch is handled with strict quality and purity standards.",
+              t: "Complete Integrity",
+              d: "No hidden compromise and no uncertainty of origin.",
             },
           ].map((v) => (
             <div
@@ -160,31 +150,31 @@ function About() {
         </div>
       </section>
 
-      {/* STATS */}
+      {/* INTEGRITY */}
       <section className="container-x py-20">
         <div className="bg-primary text-primary-foreground rounded-3xl p-12 md:p-20 text-center shadow-elegant">
           <p className="text-[10px] tracking-[0.4em] uppercase text-gold mb-3">
-            Our Commitment
+            A Small Business With Complete Integrity
           </p>
 
           <h2 className="font-display text-4xl mb-10">
-            Pure spices. Honest farming. Real quality.
+            Pure, original, unmixed spices.
           </h2>
 
           <div className="grid grid-cols-2 md:grid-cols-4 gap-8">
             {[
               {
                 n: "100%",
-                l: "Pure Products",
+                l: "Original Products",
               },
 
               {
                 n: "Farm",
-                l: "Direct Supply",
+                l: "Direct Operation",
               },
 
               {
-                n: "No",
+                n: "Zero",
                 l: "Artificial Mixing",
               },
 
@@ -203,6 +193,42 @@ function About() {
                 </p>
               </div>
             ))}
+          </div>
+
+          <p className="mt-10 text-primary-foreground/80 max-w-3xl mx-auto leading-relaxed">
+            We are not a large brand. We are a small,
+            farm-direct operation. And that is precisely our
+            strength. Being small allows us to control every
+            step — from sowing to grinding to packing.
+          </p>
+
+          <p className="mt-5 text-primary-foreground/80 max-w-3xl mx-auto leading-relaxed">
+            There is no batch variation, no hidden compromise,
+            and no loss of traceability. Our customer knows
+            exactly where their spice comes from. Because it
+            comes from our field.
+          </p>
+
+          <div className="mt-10">
+            <p className="text-[10px] tracking-[0.4em] uppercase text-gold mb-3">
+              Our Commitment
+            </p>
+
+            <p className="text-lg text-primary-foreground/85 max-w-3xl mx-auto leading-relaxed">
+              Ashok Naturals is not a story of decades. It is
+              a story of honesty in a crowded market.
+            </p>
+
+            <p className="mt-5 text-lg text-primary-foreground/85 max-w-3xl mx-auto leading-relaxed">
+              Started in 2025, based in Dolika, Rajasthan —
+              we offer what most brands promise but rarely
+              deliver:
+            </p>
+
+            <p className="mt-5 font-semibold text-gold text-xl">
+              Pure, original, unmixed spices. Grown by us.
+              Trusted by you.
+            </p>
           </div>
 
           <Link
