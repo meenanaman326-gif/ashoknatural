@@ -1,75 +1,161 @@
 import { Link } from "@tanstack/react-router";
-import {
-  Menu,
-  ShoppingCart,
-  Search,
-  User,
-} from "lucide-react";
+import { Leaf, Mail, Phone, MapPin, Instagram, Facebook } from "lucide-react";
 
-const navItems = [
-  {
-    label: "Home",
-    to: "/",
-  },
-  {
-    label: "Products",
-    to: "/products",
-  },
-  {
-    label: "About",
-    to: "/about",
-  },
-  {
-    label: "Contact",
-    to: "/contact",
-  },
-];
-
-export function Header() {
+export function Footer() {
   return (
-    <header className="sticky top-0 z-50 bg-background/90 backdrop-blur border-b">
-      <div className="container-x h-16 flex items-center justify-between">
-        {/* Logo */}
-        <Link
-          to="/"
-          className="text-2xl font-display text-primary"
-        >
-          Ashok Naturals
-        </Link>
+    <footer className="bg-primary text-primary-foreground mt-24">
+      <div className="container-x py-16 grid gap-12 md:grid-cols-2 lg:grid-cols-4">
+        <div className="lg:col-span-2 space-y-4">
+          <div className="flex items-center gap-2">
+            <span className="w-10 h-10 rounded-full bg-gradient-gold grid place-items-center">
+              <Leaf className="w-5 h-5 text-primary" />
+            </span>
 
-        {/* Desktop Nav */}
-        <nav className="hidden md:flex items-center gap-6">
-          {navItems.map((item) => (
-            <Link
-              key={item.label}
-              to={item.to}
-              className="text-sm font-medium hover:text-primary transition-colors"
+            <span className="font-display text-2xl">
+              Ashok Naturals
+            </span>
+          </div>
+
+          <p className="text-sm text-primary-foreground/80 max-w-sm">
+            Stone-ground spices, raw forest honey and natural foods —
+            sourced directly from Indian farms, delivered with love.
+          </p>
+
+          <div className="flex gap-3 pt-2">
+            {/* Instagram */}
+            <a
+              href="https://www.instagram.com/ashoknaturals?utm_source=qr&igsh=MWlwdWY3bDdlMWIwMA=="
+              target="_blank"
+              rel="noopener noreferrer"
+              className="w-9 h-9 grid place-items-center rounded-full bg-primary-foreground/10 hover:bg-pink-500 hover:text-white transition-colors"
             >
-              {item.label}
-            </Link>
-          ))}
-        </nav>
+              <Instagram className="w-4 h-4" />
+            </a>
 
-        {/* Right Side */}
-        <div className="flex items-center gap-4">
-          <button className="hover:text-primary transition-colors">
-            <Search className="w-5 h-5" />
-          </button>
+            {/* Facebook */}
+            <a
+              href="https://www.facebook.com/share/17fP73sNoV/"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="w-9 h-9 grid place-items-center rounded-full bg-primary-foreground/10 hover:bg-blue-600 hover:text-white transition-colors"
+            >
+              <Facebook className="w-4 h-4" />
+            </a>
+          </div>
+        </div>
 
-          <button className="hover:text-primary transition-colors">
-            <ShoppingCart className="w-5 h-5" />
-          </button>
+        <div>
+          <h4 className="font-display text-lg mb-4">
+            Shop
+          </h4>
 
-          <button className="hover:text-primary transition-colors">
-            <User className="w-5 h-5" />
-          </button>
+          <ul className="space-y-2 text-sm text-primary-foreground/80">
+            <li>
+              <Link to="/products">All Products</Link>
+            </li>
 
-          {/* Mobile Menu */}
-          <button className="md:hidden hover:text-primary transition-colors">
-            <Menu className="w-6 h-6" />
-          </button>
+            <li>
+              <Link
+                to="/products"
+                search={{ category: "Whole Spices" } as never}
+              >
+                Whole Spices
+              </Link>
+            </li>
+
+            <li>
+              <Link
+                to="/products"
+                search={{ category: "Ground Spices" } as never}
+              >
+                Ground Spices
+              </Link>
+            </li>
+
+            <li>
+              <Link
+                to="/products"
+                search={{ category: "Spice Blends" } as never}
+              >
+                Spice Blends
+              </Link>
+            </li>
+
+            <li>
+              <Link
+                to="/products"
+                search={{ category: "Natural Foods" } as never}
+              >
+                Natural Foods
+              </Link>
+            </li>
+          </ul>
+        </div>
+
+        <div>
+          <h4 className="font-display text-lg mb-4">
+            Help
+          </h4>
+
+          <ul className="space-y-2 text-sm text-primary-foreground/80">
+            <li>
+              <Link to="/faq">FAQ</Link>
+            </li>
+
+            <li>
+              <Link to="/shipping">Shipping & Returns</Link>
+            </li>
+
+            <li>
+              <Link to="/privacy">Privacy Policy</Link>
+            </li>
+
+            <li>
+              <Link to="/terms">Terms & Conditions</Link>
+            </li>
+
+            
+          </ul>
+        </div>
+
+        <div>
+          <h4 className="font-display text-lg mb-4">
+            Contact
+          </h4>
+
+          <ul className="space-y-3 text-sm text-primary-foreground/80">
+            <li className="flex gap-2">
+              <MapPin className="w-4 h-4 mt-0.5 shrink-0 text-gold" />
+              <span>
+                Dolika, Rajasthan 303304
+              </span>
+            </li>
+
+            <li className="flex gap-2">
+              <Phone className="w-4 h-4 mt-0.5 shrink-0 text-gold" />
+              <span>+91 94148 57764</span>
+            </li>
+
+            <li className="flex gap-2">
+              <Mail className="w-4 h-4 mt-0.5 shrink-0 text-gold" />
+              <span>ashoknaturals132025@gmail.com</span>
+            </li>
+          </ul>
         </div>
       </div>
-    </header>
+
+      <div className="border-t border-primary-foreground/10">
+        <div className="container-x py-5 text-xs text-primary-foreground/70 flex flex-wrap items-center justify-between gap-2">
+          <p>
+            © {new Date().getFullYear()} Ashok Naturals.
+            All rights reserved.
+          </p>
+
+          <p>
+            Made with love in India · FSSAI Lic. 10021022001234
+          </p>
+        </div>
+      </div>
+    </footer>
   );
 }
