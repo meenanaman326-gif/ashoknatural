@@ -75,7 +75,7 @@ export function Header() {
               </Link>
             ))}
             <Link to="/auth" onClick={() => setOpen(false)} className="py-3 text-base font-medium">Account</Link>
-            <Link to="/admin" onClick={() => setOpen(false)} className="py-3 text-base font-medium">Admin</Link>
+            
           </nav>
         </div>
       )}
