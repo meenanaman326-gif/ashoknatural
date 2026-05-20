@@ -114,9 +114,7 @@ export function Footer() {
               <Link to="/terms">Terms & Conditions</Link>
             </li>
 
-            <li>
-              <Link to="/admin">Admin</Link>
-            </li>
+            
           </ul>
         </div>
 
@@ -140,7 +138,7 @@ export function Footer() {
 
             <li className="flex gap-2">
               <Mail className="w-4 h-4 mt-0.5 shrink-0 text-gold" />
-              <span>care@ashoknaturals.in</span>
+              <span>ashoknaturals132025@gmail.com</span>
             </li>
           </ul>
         </div>
