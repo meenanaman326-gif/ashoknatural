@@ -572,6 +572,24 @@ function Checkout() {
                   <button onClick={() => openUPIApp("paytm")} className="px-4 py-2 bg-blue-600 text-white rounded-xl text-sm">Paytm</button>
                 </div>
               </div>
+              const form = formRef.current;
+
+const get = (name: string) =>
+  (form?.elements.namedItem(name) as HTMLInputElement | null)?.value ?? "";
+
+await sendOrderEmail({
+  customerEmail: get("email"),
+  customerName: `${get("firstName")} ${get("lastName")}`,
+  orderId,
+  total,
+  paymentMethod: "Cash on Delivery",
+  address: `${get("address1")} ${get("address2")} ${get("city")} ${get("state")} ${get("pincode")}`,
+  items: items.map((it) => ({
+    name: findProduct(it.productId)?.name || "Product",
+    qty: it.qty,
+    price: it.price,
+  })),
+});
 
               {/* Confirm Button */}
               <button
