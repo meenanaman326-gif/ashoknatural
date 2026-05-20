@@ -1,10 +1,10 @@
 import { Link } from "@tanstack/react-router";
-import { Leaf, Mail, Phone, MapPin, Instagram, Facebook, Twitter } from "lucide-react";
+import { Leaf, Mail, Phone, MapPin, Instagram, Facebook } from "lucide-react";
 
 export function Footer() {
   return (
     <footer className="bg-primary text-primary-foreground mt-24">
-      <div className="container-x py-16 grid gap-12 md:grid-cols-2 lg:grid-cols-5">
+      <div className="container-x py-16 grid gap-12 md:grid-cols-2 lg:grid-cols-4">
         <div className="lg:col-span-2 space-y-4">
           <div className="flex items-center gap-2">
             <span className="w-10 h-10 rounded-full bg-gradient-gold grid place-items-center">
@@ -41,21 +41,13 @@ export function Footer() {
             >
               <Facebook className="w-4 h-4" />
             </a>
-
-            {/* Twitter/X */}
-            <a
-              href="https://x.com/"
-              target="_blank"
-              rel="noopener noreferrer"
-              className="w-9 h-9 grid place-items-center rounded-full bg-primary-foreground/10 hover:bg-black hover:text-white transition-colors"
-            >
-              <Twitter className="w-4 h-4" />
-            </a>
           </div>
         </div>
 
         <div>
-          <h4 className="font-display text-lg mb-4">Shop</h4>
+          <h4 className="font-display text-lg mb-4">
+            Shop
+          </h4>
 
           <ul className="space-y-2 text-sm text-primary-foreground/80">
             <li>
@@ -101,7 +93,9 @@ export function Footer() {
         </div>
 
         <div>
-          <h4 className="font-display text-lg mb-4">Help</h4>
+          <h4 className="font-display text-lg mb-4">
+            Help
+          </h4>
 
           <ul className="space-y-2 text-sm text-primary-foreground/80">
             <li>
